@@ -42,6 +42,15 @@ services:
       timeout: 3s
       retries: 10
 
+  # Local mail catcher for development: SMTP on 1026, web inbox on http://localhost:8026
+  mail:
+    image: axllent/mailpit:v1.27
+    container_name: ghostwork-mail
+    restart: unless-stopped
+    ports:
+      - "${MAIL_SMTP_PORT:-1026}:1025"
+      - "${MAIL_UI_PORT:-8026}:8025"
+
 volumes:
   ghostwork_postgres_data:
   ghostwork_redis_data:

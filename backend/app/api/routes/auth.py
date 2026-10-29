@@ -100,7 +100,10 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
     "/refresh",
     response_model=TokenResponse,
     dependencies=[Depends(RateLimit("refresh", 60, 60))],
-    responses={409: {"description": "Concurrent refresh; retry once."}},
+    responses={
+        204: {"description": "No refresh cookie: the browser is not signed in."},
+        409: {"description": "Concurrent refresh; retry once."},
+    },
 )
 def refresh(
     request: Request,
@@ -117,7 +120,8 @@ def refresh(
         require_csrf(request, request.headers.get("X-GhostWork-CSRF"))
         token, client = refresh_cookie, "web"
     if not token:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in.")
+        # No session at all is a normal state for a browser, not an error.
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     try:
         user, issued = auth_service.rotate_session(
             db, token, request.headers.get("user-agent"), client_ip(request)

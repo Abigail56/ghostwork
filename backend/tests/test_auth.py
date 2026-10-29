@@ -108,6 +108,15 @@ def test_logout_revokes_session_and_access_token(client):
     headers = {"Authorization": f"Bearer {body['access_token']}"}
     assert client.post("/api/v1/auth/logout", headers=CSRF).status_code == 200
     assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
+    # The cookie is cleared on logout, so the browser is simply signed out.
+    assert client.post("/api/v1/auth/refresh", headers=CSRF).status_code == 204
+
+
+def test_revoked_cookie_cannot_refresh(client):
+    register(client)
+    token = client.cookies.get("gw_refresh")
+    client.post("/api/v1/auth/logout", headers=CSRF)
+    client.cookies.set("gw_refresh", token, path="/api/v1/auth")
     assert client.post("/api/v1/auth/refresh", headers=CSRF).status_code == 401
 
 
