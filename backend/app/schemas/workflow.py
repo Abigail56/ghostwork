@@ -70,7 +70,14 @@ class WorkflowRead(WorkflowSummary):
     definition: dict
     version: int
     webhook_url: str | None = None
+    webhook_signing_enabled: bool = False
     validation: list[ValidationIssue] = []
+
+
+class WebhookSecretResponse(BaseModel):
+    secret: str
+    header: str = "X-GhostWork-Signature"
+    algorithm: str = "HMAC-SHA256 of the raw body, hex, prefixed with sha256="
 
 
 class StatusChange(BaseModel):

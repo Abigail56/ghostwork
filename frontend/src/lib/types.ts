@@ -15,6 +15,8 @@ export interface User {
   density: "comfortable" | "compact";
   created_at: string;
   password_changed_at: string | null;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
 }
 
 export interface TokenResponse {
@@ -92,6 +94,7 @@ export interface Workflow extends WorkflowSummary {
   definition: WorkflowDefinition;
   version: number;
   webhook_url: string | null;
+  webhook_signing_enabled: boolean;
   validation: ValidationIssue[];
 }
 

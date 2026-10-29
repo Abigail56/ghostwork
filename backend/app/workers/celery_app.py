@@ -28,5 +28,6 @@ celery_app.conf.update(
     beat_schedule={
         "dispatch-due-schedules": {"task": "ghostwork.dispatch_due_schedules", "schedule": 30.0},
         "reap-stale-executions": {"task": "ghostwork.reap_stale_executions", "schedule": 120.0},
+        "purge-old-executions": {"task": "ghostwork.purge_old_executions", "schedule": 6 * 3600.0},
     },
 )

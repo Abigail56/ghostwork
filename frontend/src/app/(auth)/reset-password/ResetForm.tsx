@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { AuthHeading } from "@/components/app/AuthCard";
 import { PasswordInput, PasswordStrength, passwordProblems } from "@/components/app/PasswordInput";
@@ -32,9 +32,10 @@ export function ResetForm() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { password: "", confirm: "" } });
+  const passwordValue = useWatch({ control, name: "password" }) ?? "";
 
   if (!token) {
     return (
@@ -74,7 +75,7 @@ export function ResetForm() {
           {(p) => (
             <div>
               <PasswordInput {...p} autoComplete="new-password" {...register("password")} />
-              <PasswordStrength value={watch("password")} />
+              <PasswordStrength value={passwordValue} />
             </div>
           )}
         </Field>

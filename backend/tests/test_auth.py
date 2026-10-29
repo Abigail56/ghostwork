@@ -25,7 +25,7 @@ def test_register_hashes_password_with_argon2(client):
 
 def test_register_sets_httponly_refresh_cookie(client):
     response = client.post(
-        "/api/v1/auth/register", json={"email": "a@example.com", "full_name": "A", "password": PASSWORD}
+        "/api/v1/auth/register", json={"email": "a@example.com", "full_name": "A", "password": PASSWORD, "accept_terms": True}
     )
     cookie = response.headers["set-cookie"]
     assert "gw_refresh=" in cookie
@@ -38,7 +38,7 @@ def test_register_sets_httponly_refresh_cookie(client):
 def test_register_rejects_duplicate_email_case_insensitive(client):
     register(client)
     response = client.post(
-        "/api/v1/auth/register", json={"email": "ADA@example.com", "full_name": "Ada", "password": PASSWORD}
+        "/api/v1/auth/register", json={"email": "ADA@example.com", "full_name": "Ada", "password": PASSWORD, "accept_terms": True}
     )
     assert response.status_code == 409
 
@@ -46,7 +46,7 @@ def test_register_rejects_duplicate_email_case_insensitive(client):
 def test_register_validates_password(client):
     for password in ["short1", "lettersonlypassword", "1234567890123"]:
         response = client.post(
-            "/api/v1/auth/register", json={"email": "b@example.com", "full_name": "B", "password": password}
+            "/api/v1/auth/register", json={"email": "b@example.com", "full_name": "B", "password": password, "accept_terms": True}
         )
         assert response.status_code == 422
 
@@ -222,3 +222,14 @@ def test_update_profile_and_preferences(client, auth):
     body = response.json()
     assert body["full_name"] == "Ada King" and body["density"] == "compact" and body["notify_on_success"] is True
     assert client.patch("/api/v1/users/me", headers=auth, json={"density": "huge"}).status_code == 422
+
+
+def test_register_requires_terms_acceptance(client):
+    base = {"email": "t@example.com", "full_name": "T", "password": PASSWORD}
+    assert client.post("/api/v1/auth/register", json=base).status_code == 422
+    rejected = client.post("/api/v1/auth/register", json={**base, "accept_terms": False})
+    assert rejected.status_code == 422 and "Terms of Service" in rejected.text
+    ok = client.post("/api/v1/auth/register", json={**base, "accept_terms": True})
+    assert ok.status_code == 201
+    user = ok.json()["user"]
+    assert user["terms_version"] == settings.TERMS_VERSION and user["terms_accepted_at"]

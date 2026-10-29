@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
     COOKIE_DOMAIN: str | None = None
 
+    # Version of the Terms of Service users accept at registration (bump when they change).
+    TERMS_VERSION: str = "2026-10-30"
+
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
     # Public base URL of this API (used to build webhook URLs).
@@ -66,6 +69,8 @@ class Settings(BaseSettings):
     HTTP_ACTION_MAX_TIMEOUT_SECONDS: int = 30
     HTTP_ACTION_MAX_RESPONSE_BYTES: int = 1_000_000
     WEBHOOK_MAX_PAYLOAD_BYTES: int = 256_000
+    # Finished executions older than this are deleted by the beat scheduler (0 = keep forever).
+    EXECUTION_RETENTION_DAYS: int = 90
     # Only for local development against services on your own machine.
     ALLOW_PRIVATE_NETWORK_REQUESTS: bool = False
 

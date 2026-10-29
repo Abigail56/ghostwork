@@ -286,3 +286,31 @@ export function useChangePassword() {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.sessions }),
   });
 }
+
+export function useEnableWebhookSigning(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ secret: string; header: string; algorithm: string }>(`/workflows/${id}/webhook/secret`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.workflow(id) }),
+  });
+}
+
+export function useDisableWebhookSigning(id: string) {
+  const invalidate = useInvalidateWorkflows();
+  return useMutation({
+    mutationFn: () => api<Workflow>(`/workflows/${id}/webhook/secret`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useChangeEmail() {
+  return useMutation({
+    mutationFn: (body: { new_email: string; password: string }) => api<User>("/users/me/email", { method: "POST", body }),
+  });
+}
+
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: (password: string) => api<void>("/users/me", { method: "DELETE", body: { password } }),
+  });
+}

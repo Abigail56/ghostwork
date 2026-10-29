@@ -3,7 +3,7 @@ import { registerViaUi } from "./helpers";
 
 test("create a workflow, build it, run it, and delete it", async ({ page }) => {
   await registerViaUi(page);
-  await page.goto("/workflows/new");
+  await page.goto("/workflows/new", { waitUntil: "networkidle" });
   await page.getByLabel("Name").fill("E2E greeting");
   await page.getByRole("button", { name: "Create and open builder" }).click();
   await expect(page).toHaveURL(/\/builder$/);
@@ -48,7 +48,7 @@ test("create a workflow, build it, run it, and delete it", async ({ page }) => {
 
 test("activation is blocked until the workflow is valid", async ({ page }) => {
   await registerViaUi(page);
-  await page.goto("/workflows/new");
+  await page.goto("/workflows/new", { waitUntil: "networkidle" });
   await page.getByLabel("Name").fill("Incomplete");
   await page.getByRole("button", { name: "Create and open builder" }).click();
   await expect(page).toHaveURL(/\/builder$/);

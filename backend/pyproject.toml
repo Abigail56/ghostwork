@@ -1,0 +1,9 @@
+[project]
+name = "ghostwork-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:starlette.testclient", "ignore:Using `httpx` with `starlette.testclient`"]

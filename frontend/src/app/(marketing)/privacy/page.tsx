@@ -31,10 +31,20 @@ export default function PrivacyPage() {
           GhostWork uses one essential cookie: an HttpOnly refresh-session cookie that keeps you signed in. It is not
           readable by page scripts and is only sent to the authentication endpoints.
         </p>
-        <h2>Deleting data</h2>
+        <h2>Retention and deletion</h2>
+        <ul>
+          <li>Finished executions are deleted automatically after 90 days.</li>
+          <li>Deleting a workflow deletes its execution history.</li>
+          <li>Disconnecting an integration deletes its stored credentials.</li>
+          <li>
+            Deleting your account (Settings → Security) permanently deletes your profile, sessions, workflows, run
+            history, integrations and notifications.
+          </li>
+        </ul>
+        <h2>Terms</h2>
         <p>
-          Deleting a workflow deletes its execution history. Disconnecting an integration deletes its stored
-          credentials.
+          Using GhostWork is also subject to the <a href="/terms">Terms of Service</a>, which you accept when you
+          create an account. We record which version you accepted and when.
         </p>
       </Prose>
     </>

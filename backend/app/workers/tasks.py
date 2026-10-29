@@ -3,11 +3,12 @@ import uuid
 from datetime import timedelta
 
 from celery.exceptions import SoftTimeLimitExceeded
+from sqlalchemy import delete
 from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.db.session import engine
-from app.models import ExecutionStatus, ExecutionStep, Workflow, WorkflowExecution, WorkflowStatus
+from app.models import FINISHED_EXECUTION_STATUSES, ExecutionStatus, ExecutionStep, Workflow, WorkflowExecution, WorkflowStatus
 from app.models.base import utcnow
 from app.services import execution_engine
 from app.workers.celery_app import celery_app
@@ -90,3 +91,20 @@ def reap_stale_executions() -> int:
             )
             reaped += 1
     return reaped
+
+
+@celery_app.task(name="ghostwork.purge_old_executions")
+def purge_old_executions() -> int:
+    """Delete finished executions older than EXECUTION_RETENTION_DAYS (steps cascade)."""
+    if settings.EXECUTION_RETENTION_DAYS <= 0:
+        return 0
+    cutoff = utcnow() - timedelta(days=settings.EXECUTION_RETENTION_DAYS)
+    with Session(engine) as db:
+        result = db.exec(
+            delete(WorkflowExecution).where(
+                WorkflowExecution.created_at < cutoff,
+                WorkflowExecution.status.in_(FINISHED_EXECUTION_STATUSES),
+            )
+        )
+        db.commit()
+        return result.rowcount

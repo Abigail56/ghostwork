@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { AuthHeading } from "@/components/app/AuthCard";
 import { PasswordInput, PasswordStrength, passwordProblems } from "@/components/app/PasswordInput";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { InlineAlert } from "@/components/ui/Feedback";
 import { Field, Input } from "@/components/ui/Form";
 import { useAuth } from "@/lib/auth";
+import { TermsAgreement } from "./TermsAgreement";
 
 const schema = z.object({
   fullName: z.string().trim().min(1, "Enter your name.").max(120),
@@ -20,6 +21,7 @@ const schema = z.object({
     const problem = passwordProblems(value);
     if (problem) ctx.addIssue({ code: "custom", message: problem });
   }),
+  acceptTerms: z.boolean().refine((v) => v, "Please read and accept the Terms of Service to continue."),
 });
 type Values = z.infer<typeof schema>;
 
@@ -30,9 +32,10 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting },
-  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { password: "" } });
+  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { password: "", acceptTerms: false } });
+  const passwordValue = useWatch({ control, name: "password" }) ?? "";
 
   useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
@@ -41,7 +44,7 @@ export default function RegisterPage() {
   const onSubmit = async (values: Values) => {
     setError(null);
     try {
-      await createAccount(values.fullName, values.email, values.password);
+      await createAccount(values.fullName, values.email, values.password, values.acceptTerms);
       router.replace("/dashboard");
     } catch (e) {
       setError((e as Error).message);
@@ -63,24 +66,17 @@ export default function RegisterPage() {
           {(p) => (
             <div>
               <PasswordInput {...p} autoComplete="new-password" {...register("password")} />
-              <PasswordStrength value={watch("password")} />
+              <PasswordStrength value={passwordValue} />
             </div>
           )}
         </Field>
+        <TermsAgreement
+          error={errors.acceptTerms?.message}
+          registerProps={register("acceptTerms")}
+        />
         <Button type="submit" variant="primary" size="lg" loading={isSubmitting} className="mt-1 w-full">
           Create account
         </Button>
-        <p className="text-center text-meta text-fg-muted">
-          By creating an account you agree to the{" "}
-          <Link href="/terms" className="text-fg-secondary underline-offset-2 hover:underline">
-            Terms
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="text-fg-secondary underline-offset-2 hover:underline">
-            Privacy policy
-          </Link>
-          .
-        </p>
       </form>
       <p className="mt-6 text-center text-body text-fg-muted">
         Already have an account?{" "}

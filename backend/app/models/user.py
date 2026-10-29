@@ -25,6 +25,10 @@ class User(SQLModel, table=True):
     reduce_motion: str = Field(default="system", max_length=10)  # system | reduce | full
     density: str = Field(default="comfortable", max_length=12)  # comfortable | compact
 
+    # Which Terms of Service the user accepted, and when.
+    terms_version: str | None = Field(default=None, max_length=20)
+    terms_accepted_at: datetime | None = optional_timestamp_field()
+
     password_changed_at: datetime | None = optional_timestamp_field()
     created_at: datetime = created_at_field()
     updated_at: datetime = created_at_field()

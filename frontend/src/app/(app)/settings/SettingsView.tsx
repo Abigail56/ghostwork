@@ -3,19 +3,20 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Bell, KeyRound, Laptop, MonitorSmartphone, Palette, ScrollText, Smartphone, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { PasswordInput, PasswordStrength, passwordProblems } from "@/components/app/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, InlineAlert, LoadingBlock } from "@/components/ui/Feedback";
 import { Field, Input, SegmentedControl, Switch } from "@/components/ui/Form";
 import { Card, CardHeader, Pagination, Tabs } from "@/components/ui/Layout";
-import { ConfirmDialog } from "@/components/ui/Overlay";
+import { ConfirmDialog, Dialog } from "@/components/ui/Overlay";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth, useRequiredUser } from "@/lib/auth";
 import { formatDate, formatDateTime, initials, timeAgo } from "@/lib/format";
-import { useActivity, useChangePassword, useSessionAction, useSessions, useUpdateProfile } from "@/lib/queries";
+import { useActivity, useChangeEmail, useChangePassword, useDeleteAccount, useSessionAction, useSessions, useUpdateProfile } from "@/lib/queries";
 import type { User as UserType } from "@/lib/types";
 
 const TABS = [
@@ -43,6 +44,116 @@ function useSavePreferences() {
         onError: (e) => toast({ tone: "error", title: "Couldn't save", description: (e as Error).message }),
       }),
   };
+}
+
+function ChangeEmailButton() {
+  const { setUser } = useAuth();
+  const change = useChangeEmail();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const close = () => {
+    setOpen(false);
+    setEmail("");
+    setPassword("");
+    change.reset();
+  };
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="text-violet hover:underline">
+        Change email
+      </button>
+      <Dialog
+        open={open}
+        onClose={close}
+        title="Change email"
+        description="You'll sign in with the new address. We'll notify your current address about the change."
+        size="sm"
+        footer={
+          <>
+            <Button onClick={close}>Cancel</Button>
+            <Button type="submit" form="change-email" variant="primary" loading={change.isPending}>
+              Change email
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="change-email"
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            change.mutate(
+              { new_email: email.trim(), password },
+              {
+                onSuccess: (user) => {
+                  setUser(user);
+                  toast({ tone: "success", title: "Email updated", description: user.email });
+                  close();
+                },
+              },
+            );
+          }}
+        >
+          {change.isError && <InlineAlert>{change.error.message}</InlineAlert>}
+          <Field label="New email">{(p) => <Input {...p} type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />}</Field>
+          <Field label="Current password">{(p) => <PasswordInput {...p} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />}</Field>
+        </form>
+      </Dialog>
+    </>
+  );
+}
+
+function DangerZone() {
+  const remove = useDeleteAccount();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  return (
+    <Card className="mt-5 border-danger/30">
+      <CardHeader title="Delete account" description="Permanently delete your account, workflows, run history and connected integrations." />
+      <div className="flex justify-end p-4 sm:p-5">
+        <Button variant="danger" onClick={() => setOpen(true)}>
+          Delete account
+        </Button>
+      </div>
+      <Dialog
+        open={open}
+        onClose={() => (setOpen(false), setPassword(""), setConfirmText(""), remove.reset())}
+        title="Delete your account?"
+        description="This can't be undone. Active schedules and webhooks stop immediately."
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>Cancel</Button>
+            <Button
+              variant="danger"
+              loading={remove.isPending}
+              disabled={confirmText !== "DELETE" || !password}
+              onClick={() =>
+                remove.mutate(password, {
+                  onSuccess: () => {
+                    queryClient.clear();
+                    window.location.assign("/?deleted=1");
+                  },
+                })
+              }
+            >
+              Delete forever
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {remove.isError && <InlineAlert>{remove.error.message}</InlineAlert>}
+          <Field label="Current password">{(p) => <PasswordInput {...p} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />}</Field>
+          <Field label='Type "DELETE" to confirm'>{(p) => <Input {...p} value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoComplete="off" />}</Field>
+        </div>
+      </Dialog>
+    </Card>
+  );
 }
 
 const profileSchema = z.object({ full_name: z.string().trim().min(1, "Enter your name.").max(120) });
@@ -87,7 +198,7 @@ function ProfileTab() {
           <Field label="Full name" error={errors.full_name?.message}>
             {(p) => <Input {...p} autoComplete="name" {...register("full_name")} />}
           </Field>
-          <Field label="Email" hint="Changing your email isn't supported yet.">
+          <Field label="Email" hint={<ChangeEmailButton />}>
             {(p) => <Input {...p} value={user.email} disabled readOnly />}
           </Field>
         </div>
@@ -120,9 +231,10 @@ function SecurityTab() {
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     formState: { errors },
   } = useForm<z.infer<typeof passwordSchema>>({ resolver: zodResolver(passwordSchema), defaultValues: { new_password: "" } });
+  const newPassword = useWatch({ control, name: "new_password" }) ?? "";
   return (
     <Card>
       <CardHeader
@@ -153,7 +265,7 @@ function SecurityTab() {
             {(p) => (
               <div>
                 <PasswordInput {...p} autoComplete="new-password" {...register("new_password")} />
-                <PasswordStrength value={watch("new_password") ?? ""} />
+                <PasswordStrength value={newPassword} />
               </div>
             )}
           </Field>
@@ -372,7 +484,12 @@ export function SettingsView() {
         <Tabs label="Settings sections" value={tab} onChange={setTab} tabs={[...TABS]} className="lg:flex-col lg:overflow-visible" />
         <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="min-w-0 max-w-3xl animate-fade-in" key={tab}>
           {tab === "profile" && <ProfileTab />}
-          {tab === "security" && <SecurityTab />}
+          {tab === "security" && (
+            <>
+              <SecurityTab />
+              <DangerZone />
+            </>
+          )}
           {tab === "sessions" && <SessionsTab />}
           {tab === "notifications" && <NotificationsTab />}
           {tab === "appearance" && <AppearanceTab />}

@@ -46,10 +46,18 @@ class IssuedTokens:
 def register_user(db: Session, email: str, full_name: str, password: str) -> User:
     if db.exec(select(User).where(User.email == email)).first() is not None:
         raise AuthError("An account with this email already exists.", code="email_taken")
-    user = User(email=email, full_name=full_name, hashed_password=hash_password(password))
+    user = User(
+        email=email,
+        full_name=full_name,
+        hashed_password=hash_password(password),
+        terms_version=settings.TERMS_VERSION,
+        terms_accepted_at=utcnow(),
+    )
     db.add(user)
     db.flush()
-    record_activity(db, user.id, "account.created", "Account created")
+    record_activity(
+        db, user.id, "account.created", f"Account created; Terms of Service ({settings.TERMS_VERSION}) accepted"
+    )
     return user
 
 

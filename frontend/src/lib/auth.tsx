@@ -11,7 +11,7 @@ interface AuthContextValue {
   status: Status;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (fullName: string, email: string, password: string) => Promise<void>;
+  register: (fullName: string, email: string, password: string, acceptTerms: boolean) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User) => void;
 }
@@ -103,8 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const register = useCallback(
-    async (fullName: string, email: string, password: string) => {
-      accept(await authRequest<TokenResponse>("/auth/register", { full_name: fullName, email, password }));
+    async (fullName: string, email: string, password: string, acceptTerms: boolean) => {
+      accept(
+        await authRequest<TokenResponse>("/auth/register", { full_name: fullName, email, password, accept_terms: acceptTerms }),
+      );
     },
     [accept],
   );

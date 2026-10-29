@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Column, ForeignKey, Index, String, Uuid
+from sqlalchemy import Column, ForeignKey, Index, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -36,6 +36,8 @@ class Workflow(SQLModel, table=True):
     webhook_token: str | None = Field(
         default=None, sa_column=Column(String(64), unique=True, index=True, nullable=True)
     )
+    # Optional HMAC signing secret for webhook calls (Fernet-encrypted).
+    webhook_secret_encrypted: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     next_run_at: datetime | None = optional_timestamp_field()
     last_run_at: datetime | None = optional_timestamp_field()
     version: int = Field(default=1)

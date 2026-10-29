@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from app.api.deps import CurrentUser, SessionDep
 from app.api.routes.executions import escape_like, to_summary
 from app.core.config import settings
+from app.core.security import encrypt_secrets
 from app.models import Workflow, WorkflowExecution, WorkflowStatus
 from app.models.base import utcnow
 from app.schemas.common import Message, Page
@@ -19,6 +20,7 @@ from app.schemas.workflow import (
     RunRequest,
     StatusChange,
     ValidationResponse,
+    WebhookSecretResponse,
     WorkflowCreate,
     WorkflowRead,
     WorkflowSummary,
@@ -82,6 +84,7 @@ def _read(db: Session, workflow: Workflow) -> WorkflowRead:
         definition=workflow.definition,
         version=workflow.version,
         webhook_url=webhook_url,
+        webhook_signing_enabled=bool(workflow.webhook_secret_encrypted),
         validation=[i.as_dict() for i in result.issues],
     )
 
@@ -208,6 +211,31 @@ def rotate_webhook(workflow_id: uuid.UUID, user: CurrentUser, db: SessionDep):
     workflow.updated_at = utcnow()
     db.add(workflow)
     record_activity(db, user.id, "workflow.webhook_rotated", f"Webhook URL regenerated for {workflow.name}", workflow.id)
+    db.commit()
+    db.refresh(workflow)
+    return _read(db, workflow)
+
+
+@router.post("/{workflow_id}/webhook/secret", response_model=WebhookSecretResponse)
+def create_webhook_secret(workflow_id: uuid.UUID, user: CurrentUser, db: SessionDep):
+    """Create (or replace) the signing secret. It is returned only once."""
+    workflow = workflow_service.get_owned_workflow(db, user.id, workflow_id, lock=True)
+    secret = secrets.token_urlsafe(32)
+    workflow.webhook_secret_encrypted = encrypt_secrets({"secret": secret})
+    workflow.updated_at = utcnow()
+    db.add(workflow)
+    record_activity(db, user.id, "workflow.webhook_signing", f"Webhook signing enabled for {workflow.name}", workflow.id)
+    db.commit()
+    return WebhookSecretResponse(secret=secret)
+
+
+@router.delete("/{workflow_id}/webhook/secret", response_model=WorkflowRead)
+def remove_webhook_secret(workflow_id: uuid.UUID, user: CurrentUser, db: SessionDep):
+    workflow = workflow_service.get_owned_workflow(db, user.id, workflow_id, lock=True)
+    workflow.webhook_secret_encrypted = None
+    workflow.updated_at = utcnow()
+    db.add(workflow)
+    record_activity(db, user.id, "workflow.webhook_signing", f"Webhook signing disabled for {workflow.name}", workflow.id)
     db.commit()
     db.refresh(workflow)
     return _read(db, workflow)

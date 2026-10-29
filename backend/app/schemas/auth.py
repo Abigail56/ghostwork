@@ -26,7 +26,15 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=120)
     password: str
+    accept_terms: bool = Field(description="Must be true: the user accepts the current Terms of Service.")
     client: Literal["web", "mobile"] = "web"
+
+    @field_validator("accept_terms")
+    @classmethod
+    def _terms(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("You must accept the Terms of Service to create an account.")
+        return value
 
     @field_validator("email")
     @classmethod
@@ -110,6 +118,8 @@ class UserRead(BaseModel):
     density: Literal["comfortable", "compact"]
     created_at: datetime
     password_changed_at: datetime | None
+    terms_version: str | None = None
+    terms_accepted_at: datetime | None = None
 
 
 class UserUpdate(BaseModel):
@@ -149,3 +159,17 @@ class SessionRead(BaseModel):
     last_used_at: datetime
     expires_at: datetime
     current: bool
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("new_email")
+    @classmethod
+    def _email(cls, value: str) -> str:
+        return _normalize_email(value)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)

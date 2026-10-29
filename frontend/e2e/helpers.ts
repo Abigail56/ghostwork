@@ -7,10 +7,11 @@ export function uniqueEmail(prefix = "e2e") {
 }
 
 export async function registerViaUi(page: Page, name = "Grace Hopper", email = uniqueEmail()) {
-  await page.goto("/register");
+  await page.goto("/register", { waitUntil: "networkidle" });
   await page.getByLabel("Full name").fill(name);
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("checkbox", { name: /I have read and agree/ }).check();
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   return email;
