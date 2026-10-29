@@ -4,6 +4,7 @@ import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider }
 import "@xyflow/react/dist/style.css";
 import { useMemo } from "react";
 import type { ExecutionStep, WorkflowDefinition } from "@/lib/types";
+import { AutoFit } from "./AutoFit";
 import { FlowEdge } from "./FlowEdge";
 import { FlowNode } from "./FlowNode";
 import { edgeStateFromSteps, toFlowEdges, toFlowNodes } from "./flow";
@@ -59,6 +60,7 @@ export function WorkflowCanvas({
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(160,168,184,0.13)" />
           {interactive && <Controls showInteractive={false} position="bottom-right" />}
+          <AutoFit />
         </ReactFlow>
       </ReactFlowProvider>
     </div>

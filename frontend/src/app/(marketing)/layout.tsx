@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { SiteHeader } from "@/components/marketing/SiteHeader";
 
@@ -7,7 +8,9 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
       <a href="#main" className="sr-only z-50 rounded-md bg-violet px-3 py-2 text-canvas focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
         Skip to content
       </a>
-      <SiteHeader />
+      <Suspense fallback={<div className="h-16 border-b border-line-subtle" />}>
+        <SiteHeader />
+      </Suspense>
       <main id="main" className="flex-1">
         {children}
       </main>

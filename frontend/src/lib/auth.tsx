@@ -35,40 +35,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUserState] = useState<User | null>(null);
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
     setUserState(null);
     setStatus("anonymous");
+    setExpiresAt(null);
     applyPreferences(null);
     queryClient.clear();
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
   }, [queryClient]);
 
   const accept = useCallback((data: TokenResponse) => {
     setAccessToken(data.access_token);
     setUserState(data.user);
     setStatus("authenticated");
+    setExpiresAt(data.expires_at);
     applyPreferences(data.user);
-    // Refresh one minute before the access token expires.
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    const delay = Math.max(new Date(data.expires_at).getTime() - Date.now() - 60_000, 10_000);
-    refreshTimer.current = setTimeout(async () => {
+  }, []);
+
+  // Refresh the access token one minute before it expires.
+  useEffect(() => {
+    if (!expiresAt) return;
+    const delay = Math.max(new Date(expiresAt).getTime() - Date.now() - 60_000, 10_000);
+    const timer = setTimeout(async () => {
       try {
         const next = await refreshSession();
-        if (next) acceptRef.current(next);
+        if (next) accept(next);
         else clearSession();
       } catch {
-        /* network blip: the next API call will retry the refresh */
+        /* network blip: the next API call retries the refresh */
       }
     }, delay);
-  }, [clearSession]);
-  const acceptRef = useRef(accept);
-  useEffect(() => {
-    acceptRef.current = accept;
-  }, [accept]);
+    return () => clearTimeout(timer);
+  }, [expiresAt, accept, clearSession]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       setSessionLostHandler(null);
       channel.current?.close();
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
   }, [accept, clearSession]);
 

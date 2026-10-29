@@ -36,7 +36,7 @@ TEMPLATES: list[Template] = [
                     "action.http_request",
                     "Check endpoint",
                     0,
-                    140,
+                    170,
                     {"method": "GET", "url": "https://example.com", "timeout_seconds": 10, "retries": 1, "fail_on_error_status": False},
                 ),
                 _node(
@@ -44,7 +44,7 @@ TEMPLATES: list[Template] = [
                     "condition.if",
                     "Is it failing?",
                     0,
-                    280,
+                    340,
                     {"left": "{{ steps.check.status_code }}", "operator": "greater_than", "right": "399"},
                 ),
                 _node(
@@ -52,7 +52,7 @@ TEMPLATES: list[Template] = [
                     "action.email",
                     "Email alert",
                     -160,
-                    420,
+                    520,
                     {
                         "to": ["you@example.com"],
                         "subject": "Endpoint check failed ({{ steps.check.status_code }})",
@@ -77,7 +77,7 @@ TEMPLATES: list[Template] = [
                     "action.http_request",
                     "Fetch data",
                     0,
-                    140,
+                    170,
                     {"method": "GET", "url": "https://api.github.com/repos/python/cpython", "timeout_seconds": 15, "retries": 2},
                 ),
                 _node(
@@ -85,7 +85,7 @@ TEMPLATES: list[Template] = [
                     "action.transform",
                     "Keep key fields",
                     0,
-                    280,
+                    340,
                     {
                         "fields": [
                             {"key": "name", "value": "{{ steps.fetch.body.full_name }}"},
@@ -112,7 +112,7 @@ TEMPLATES: list[Template] = [
                     "action.transform",
                     "Normalize event",
                     0,
-                    140,
+                    170,
                     {
                         "fields": [
                             {"key": "event", "value": "{{ trigger.payload.body.event }}"},
@@ -126,7 +126,7 @@ TEMPLATES: list[Template] = [
                     "condition.if",
                     "High priority?",
                     0,
-                    280,
+                    340,
                     {"left": "{{ steps.normalize.priority }}", "operator": "equals", "right": "high"},
                 ),
                 _node(
@@ -134,7 +134,7 @@ TEMPLATES: list[Template] = [
                     "action.http_request",
                     "Forward event",
                     -160,
-                    420,
+                    520,
                     {
                         "method": "POST",
                         "url": "https://httpbin.org/post",
@@ -159,7 +159,7 @@ TEMPLATES: list[Template] = [
                     "action.email",
                     "Send reminder",
                     0,
-                    140,
+                    170,
                     {
                         "to": ["team@example.com"],
                         "subject": "Weekly reminder",
@@ -184,7 +184,7 @@ TEMPLATES: list[Template] = [
                     "action.slack",
                     "Post to Slack",
                     0,
-                    140,
+                    170,
                     {"text": "New event received: {{ trigger.payload.body }}"},
                 ),
             ],
