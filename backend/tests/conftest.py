@@ -13,6 +13,10 @@ os.environ["DATABASE_URL"] = _base
 os.environ["ENVIRONMENT"] = "test"
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
 os.environ["SMTP_HOST"] = ""
+# Pin limits so local .env overrides don't change test expectations.
+os.environ["LOGIN_RATE_LIMIT_PER_5_MIN"] = "10"
+os.environ["REGISTER_RATE_LIMIT_PER_HOUR"] = "50"
+os.environ["ALLOW_PRIVATE_NETWORK_REQUESTS"] = "false"
 os.environ.setdefault("INTEGRATION_ENCRYPTION_KEY", "kQhQ3dGcJYx5nHq3qQ2kD8yq8VYwU7b1b9h7cXz0M1s=")
 
 import pytest  # noqa: E402

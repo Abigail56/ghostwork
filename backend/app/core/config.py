@@ -43,8 +43,10 @@ class Settings(BaseSettings):
     # Run Celery tasks inline (tests only).
     CELERY_TASK_ALWAYS_EAGER: bool = False
 
-    # Rate limiting
+    # Rate limiting (requests per client IP per window)
     RATE_LIMIT_ENABLED: bool = True
+    REGISTER_RATE_LIMIT_PER_HOUR: int = 5
+    LOGIN_RATE_LIMIT_PER_5_MIN: int = 10
 
     # Integration credential encryption (Fernet key, urlsafe base64, 32 bytes).
     INTEGRATION_ENCRYPTION_KEY: str = ""

@@ -51,6 +51,57 @@ services:
       - "${MAIL_SMTP_PORT:-1026}:1025"
       - "${MAIL_UI_PORT:-8026}:8025"
 
+  # ---------------------------------------------------------------------------
+  # Application containers. Start with: docker compose --profile full up --build
+  # Local development normally runs these from the backend venv and `npm run dev`.
+  # ---------------------------------------------------------------------------
+  api:
+    profiles: ["full"]
+    build: ./backend
+    env_file: ./backend/.env
+    environment: &backend-env
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ghostwork}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ghostwork}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      SMTP_HOST: mail
+      SMTP_PORT: "1025"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    profiles: ["full"]
+    build: ./backend
+    env_file: ./backend/.env
+    environment: *backend-env
+    command: python -m celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  beat:
+    profiles: ["full"]
+    build: ./backend
+    env_file: ./backend/.env
+    environment: *backend-env
+    command: python -m celery -A app.workers.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    depends_on:
+      redis: { condition: service_healthy }
+
+  web:
+    profiles: ["full"]
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+
 volumes:
   ghostwork_postgres_data:
   ghostwork_redis_data:

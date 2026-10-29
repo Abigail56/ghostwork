@@ -71,7 +71,7 @@ def _token_response(response: Response, user, issued: IssuedTokens, client: str)
     "/register",
     response_model=TokenResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(RateLimit("register", 5, 3600))],
+    dependencies=[Depends(RateLimit("register", settings.REGISTER_RATE_LIMIT_PER_HOUR, 3600))],
 )
 def register(payload: RegisterRequest, request: Request, response: Response, db: SessionDep):
     try:
@@ -84,7 +84,7 @@ def register(payload: RegisterRequest, request: Request, response: Response, db:
     return _token_response(response, user, issued, payload.client)
 
 
-@router.post("/login", response_model=TokenResponse, dependencies=[Depends(RateLimit("login", 10, 300))])
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(RateLimit("login", settings.LOGIN_RATE_LIMIT_PER_5_MIN, 300))])
 def login(payload: LoginRequest, request: Request, response: Response, db: SessionDep):
     try:
         user = auth_service.authenticate(db, payload.email, payload.password)
