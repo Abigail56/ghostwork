@@ -10,7 +10,7 @@ import { SidebarContent } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { status } = useAuth();
+  const { status, exitTo } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
@@ -18,9 +18,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "anonymous") {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      // A deliberate sign-out goes where it asked; an expired session returns here after login.
+      router.replace(exitTo ?? `/login?next=${encodeURIComponent(pathname)}`);
     }
-  }, [status, pathname, router]);
+  }, [status, exitTo, pathname, router]);
 
   if (status !== "authenticated") {
     return (

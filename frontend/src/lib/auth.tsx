@@ -12,7 +12,9 @@ interface AuthContextValue {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   register: (fullName: string, email: string, password: string, acceptTerms: boolean) => Promise<void>;
-  logout: () => Promise<void>;
+  /** Sign out; the app then navigates to `exitTo` (default /login). */
+  logout: (exitTo?: string) => Promise<void>;
+  exitTo: string | null;
   setUser: (user: User) => void;
 }
 
@@ -36,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUserState] = useState<User | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [exitTo, setExitTo] = useState<string | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
 
   const clearSession = useCallback(() => {
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(data.access_token);
     setUserState(data.user);
     setStatus("authenticated");
+    setExitTo(null);
     setExpiresAt(data.expires_at);
     applyPreferences(data.user);
   }, []);
@@ -111,7 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [accept],
   );
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (destination = "/login") => {
+    setExitTo(destination);
     try {
       await authRequest("/auth/logout");
     } finally {
@@ -126,8 +131,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, login, register, logout, setUser }),
-    [status, user, login, register, logout, setUser],
+    () => ({ status, user, login, register, logout, setUser, exitTo }),
+    [status, user, login, register, logout, setUser, exitTo],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

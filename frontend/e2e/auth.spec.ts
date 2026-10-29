@@ -73,3 +73,20 @@ test("sign-up shows the terms and requires accepting them", async ({ page }) => 
   await page.goto("/settings?tab=activity");
   await expect(page.getByText(/Terms of Service \(2026-10-30\) accepted/)).toBeVisible();
 });
+
+test("delete account from settings", async ({ page }) => {
+  const email = await registerViaUi(page, "Short Lived");
+  await page.goto("/settings?tab=security");
+  await page.getByRole("button", { name: "Delete account" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete your account?" });
+  await expect(dialog.getByRole("button", { name: "Delete forever" })).toBeDisabled();
+  await dialog.getByLabel("Current password").fill(PASSWORD);
+  await dialog.getByLabel('Type "DELETE" to confirm').fill("DELETE");
+  await dialog.getByRole("button", { name: "Delete forever" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/login", { waitUntil: "networkidle" });
+  await page.getByLabel("Email", { exact: true }).filter({ visible: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).filter({ visible: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Incorrect email or password.")).toBeVisible();
+});

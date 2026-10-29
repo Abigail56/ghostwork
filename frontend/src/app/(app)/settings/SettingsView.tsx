@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Bell, KeyRound, Laptop, MonitorSmartphone, Palette, ScrollText, Smartphone, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -107,7 +106,7 @@ function ChangeEmailButton() {
 
 function DangerZone() {
   const remove = useDeleteAccount();
-  const queryClient = useQueryClient();
+  const { logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmText, setConfirmText] = useState("");
@@ -134,9 +133,9 @@ function DangerZone() {
               disabled={confirmText !== "DELETE" || !password}
               onClick={() =>
                 remove.mutate(password, {
-                  onSuccess: () => {
-                    queryClient.clear();
-                    window.location.assign("/?deleted=1");
+                  onSuccess: async () => {
+                    // The account is gone; clear local session state everywhere, then leave.
+                    await logout("/").catch(() => undefined);
                   },
                 })
               }

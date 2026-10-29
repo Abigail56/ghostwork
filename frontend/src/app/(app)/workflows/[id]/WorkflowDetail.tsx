@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, Check, Copy, History, Pause, PencilRuler, Play, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Copy, Download, History, KeyRound, Pause, PencilRuler, Play, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
@@ -10,12 +10,22 @@ import { WorkflowCanvas } from "@/components/workflow/WorkflowCanvas";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { EmptyState, ErrorState, InlineAlert, LoadingBlock } from "@/components/ui/Feedback";
 import { Card, CardHeader, KeyValue } from "@/components/ui/Layout";
-import { ConfirmDialog } from "@/components/ui/Overlay";
+import { ConfirmDialog, Dialog } from "@/components/ui/Overlay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api";
 import { formatDateTime, timeAgo, triggerLabel } from "@/lib/format";
-import { useExecution, useExecutions, useRotateWebhook, useRunWorkflow, useSetWorkflowStatus, useWorkflow } from "@/lib/queries";
+import {
+  useDisableWebhookSigning,
+  useEnableWebhookSigning,
+  useExecution,
+  useExecutions,
+  useRotateWebhook,
+  useRunWorkflow,
+  useSetWorkflowStatus,
+  useWorkflow,
+} from "@/lib/queries";
+import type { Workflow } from "@/lib/types";
 import { summarize } from "@/lib/nodes";
 
 export function CopyField({ value, label }: { value: string; label: string }) {
@@ -35,6 +45,103 @@ export function CopyField({ value, label }: { value: string; label: string }) {
       >
         {copied ? <Check size={15} className="text-success" /> : <Copy size={15} />}
       </Button>
+    </div>
+  );
+}
+
+export function exportWorkflow(w: Workflow) {
+  const data = { ghostwork: 1, name: w.name, description: w.description, definition: w.definition };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${w.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "workflow"}.ghostwork.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function WebhookSigning({ workflow }: { workflow: Workflow }) {
+  const enable = useEnableWebhookSigning(workflow.id);
+  const disable = useDisableWebhookSigning(workflow.id);
+  const toast = useToast();
+  const [secret, setSecret] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<"enable" | "disable" | null>(null);
+  const curl = `BODY='{"event":"test"}'
+SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')"
+curl -X POST "${workflow.webhook_url}" -H "Content-Type: application/json" -H "X-GhostWork-Signature: $SIG" -d "$BODY"`;
+  return (
+    <div className="border-t border-line-subtle py-3">
+      <div className="flex items-start gap-2">
+        <KeyRound size={15} className={workflow.webhook_signing_enabled ? "mt-0.5 text-success" : "mt-0.5 text-fg-muted"} aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-medium">Signed requests {workflow.webhook_signing_enabled ? "required" : "off"}</p>
+          <p className="text-meta text-fg-muted">
+            {workflow.webhook_signing_enabled
+              ? "Calls must include a valid X-GhostWork-Signature header."
+              : "Anyone with the URL can start a run. Require an HMAC signature for extra protection."}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" onClick={() => setConfirm("enable")}>
+              {workflow.webhook_signing_enabled ? "Replace secret" : "Require signature"}
+            </Button>
+            {workflow.webhook_signing_enabled && (
+              <Button size="sm" variant="ghost" onClick={() => setConfirm("disable")}>
+                Turn off
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+      <ConfirmDialog
+        open={confirm === "enable"}
+        onClose={() => setConfirm(null)}
+        title={workflow.webhook_signing_enabled ? "Replace signing secret?" : "Require signed webhooks?"}
+        description="Callers without the new secret will be rejected immediately. The secret is shown once."
+        confirmLabel={workflow.webhook_signing_enabled ? "Replace secret" : "Create secret"}
+        loading={enable.isPending}
+        onConfirm={() =>
+          enable.mutate(undefined, {
+            onSuccess: (r) => {
+              setConfirm(null);
+              setSecret(r.secret);
+            },
+            onError: (e) => toast({ tone: "error", title: "Couldn't create secret", description: (e as Error).message }),
+          })
+        }
+      />
+      <ConfirmDialog
+        open={confirm === "disable"}
+        onClose={() => setConfirm(null)}
+        title="Turn off signature checks?"
+        description="Anyone with the webhook URL will be able to start runs."
+        confirmLabel="Turn off"
+        tone="danger"
+        loading={disable.isPending}
+        onConfirm={() =>
+          disable.mutate(undefined, {
+            onSuccess: () => (setConfirm(null), toast({ tone: "success", title: "Signature checks turned off" })),
+            onError: (e) => toast({ tone: "error", title: "Couldn't turn off", description: (e as Error).message }),
+          })
+        }
+      />
+      <Dialog
+        open={secret !== null}
+        onClose={() => setSecret(null)}
+        title="Signing secret"
+        description="Copy it now — it won't be shown again."
+        footer={<Button variant="primary" onClick={() => setSecret(null)}>Done</Button>}
+      >
+        {secret && (
+          <div className="flex flex-col gap-3">
+            <CopyField value={secret} label="signing secret" />
+            <p className="text-meta text-fg-muted">
+              Send <code className="font-mono text-fg">X-GhostWork-Signature: sha256=&lt;hex&gt;</code>, where the hex value is the
+              HMAC-SHA256 of the raw request body using this secret.
+            </p>
+            <pre className="overflow-x-auto rounded-md border border-line-subtle bg-canvas p-3 font-mono text-[11px] text-fg-secondary">{curl}</pre>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }
@@ -118,6 +225,9 @@ export function WorkflowDetail({ params }: { params: Promise<{ id: string }> }) 
               <Check size={15} /> Activate
             </Button>
           )}
+          <Button onClick={() => exportWorkflow(w)} title="Download the definition as JSON">
+            <Download size={15} /> Export
+          </Button>
           <ButtonLink href={`/workflows/${w.id}/builder`} variant="primary">
             <PencilRuler size={15} /> Open builder
           </ButtonLink>
@@ -176,6 +286,7 @@ export function WorkflowDetail({ params }: { params: Promise<{ id: string }> }) 
                   {w.status !== "active" && <p className="mt-1 text-meta text-warning">Activate the workflow to accept webhook calls.</p>}
                 </div>
               )}
+              {w.webhook_url && <WebhookSigning workflow={w} />}
             </div>
           </Card>
           <Card>

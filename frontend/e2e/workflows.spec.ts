@@ -78,3 +78,21 @@ test("templates create valid workflows", async ({ page }) => {
   await expect(page).toHaveURL(/\/builder$/);
   await expect(page.getByText("Saved · valid")).toBeVisible();
 });
+
+test("webhook signing secret is shown once", async ({ page }) => {
+  await registerViaUi(page);
+  await page.goto("/workflows/new", { waitUntil: "networkidle" });
+  await page.getByLabel("Name").fill("Signed hook");
+  await page.getByRole("radio", { name: /Webhook/ }).click();
+  await page.getByRole("button", { name: "Create and open builder" }).click();
+  await expect(page).toHaveURL(/\/builder$/);
+  await page.getByRole("button", { name: "Signed hook" }).click(); // breadcrumb -> detail page
+  await expect(page.getByText("Signed requests off")).toBeVisible();
+  await page.getByRole("button", { name: "Require signature" }).click();
+  await page.getByRole("dialog", { name: "Require signed webhooks?" }).getByRole("button", { name: "Create secret" }).click();
+  const secretDialog = page.getByRole("dialog", { name: "Signing secret" });
+  await expect(secretDialog.getByText("won't be shown again")).toBeVisible();
+  await secretDialog.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("Signed requests required")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
+});
