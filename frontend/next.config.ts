@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Hide the floating dev-tools badge (it overlaps the app UI and screenshots).
+  devIndicators: false,
   experimental: {
     agentFeedback: true,
   },

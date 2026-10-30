@@ -1,8 +1,8 @@
 # GhostWork mobile (Flutter) — plan
 
-Status: **not started**. The web app and API are functional and tested; this document
-records the agreed scope and the API contract the app will use. The Flutter SDK is not
-installed on the current development machine.
+Status: **built** (`mobile/`). Flutter 3.47 / Dart 3.13. `flutter analyze` is clean and 18
+tests pass. Verified against the live API in Chrome (web build). Android and iOS builds need
+the Android SDK / Xcode, which aren't installed on the development machine.
 
 ## Scope (initial release)
 
@@ -36,11 +36,14 @@ The visual builder stays web-only.
 - Sign out with `POST /api/v1/auth/logout` and body `{"refresh_token": "..."}`.
 - No CSRF header is needed for body-token requests.
 
-## Suggested architecture
+## Architecture
 
-- `go_router` for navigation, `riverpod` for state, `dio` with an auth interceptor
-  (attach bearer, single-flight refresh on 401), `freezed`/`json_serializable` models
-  mirroring `frontend/src/lib/types.ts`.
+- `lib/data/api_client.dart` — `package:http` client: bearer auth, single-flight refresh
+  on 401, refresh-token rotation, 409 retry, friendly network errors.
+- `lib/data/token_store.dart` — `flutter_secure_storage` on Android/iOS; memory-only on web.
+- `lib/state/providers.dart` — Riverpod auth controller and data providers.
+- `lib/router.dart` — `go_router` with auth redirects and a bottom-navigation shell.
+- `lib/data/models.dart` — hand-written typed models mirroring `frontend/src/lib/types.ts`.
 - Reuse the design tokens from `frontend/src/app/globals.css` (colors, status colors)
   and the logo from `frontend/public/ghostwork-mark.svg`.
 - Tests: model parsing, the auth interceptor (rotation, 409 retry, logout on 401),

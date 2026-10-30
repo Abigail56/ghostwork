@@ -2,6 +2,11 @@
 
 **Your workflows. On autopilot.**
 
+![GhostWork design board](docs/design/ghostwork-design-board.png)
+
+*Design board rendered from the running app: brand, tokens, status system, web and mobile screens
+(`docs/design/ghostwork-design-board.png`).*
+
 GhostWork is a workflow automation platform built around the **Living Workflow**: the
 same canvas you design an automation on shows what it is doing while it runs and
 what each step did afterwards.
@@ -10,7 +15,8 @@ what each step did afterwards.
   TanStack Query, React Hook Form + Zod, React Flow (`@xyflow/react`), Recharts.
 - **Backend:** FastAPI, SQLModel/SQLAlchemy, PostgreSQL, Alembic, Celery + Redis,
   Argon2 (pwdlib), JWT, pytest.
-- **Infrastructure:** Docker Compose (PostgreSQL, Redis, Mailpit; optional app containers).
+- **Mobile:** Flutter (Android, iOS, web) with Riverpod, go_router and secure token storage.
+- **Infrastructure:** Docker Compose (PostgreSQL, Redis, Mailpit; optional app containers), GitHub Actions CI.
 
 ---
 
@@ -18,20 +24,21 @@ what each step did afterwards.
 
 | Area | Status |
 | --- | --- |
-| Accounts | Register, sign in/out, Argon2 hashing, password change, password reset by email |
+| Accounts | Register (with Terms of Service acceptance, versioned and recorded), sign in/out, Argon2 hashing, password change, password reset by email, email change, account deletion |
 | Sessions | 15-min access tokens + rotating refresh sessions (HttpOnly cookie), reuse detection, per-device revocation, CSRF guard |
-| Workflows | Create, list (search/filter/sort/paginate), edit, duplicate, activate/pause, delete, ownership enforced server-side |
+| Workflows | Create, list (search/filter/sort/paginate), edit, duplicate, activate/pause, delete, JSON export/import, ownership enforced server-side |
 | Builder | Drag/click to add steps, connect, configure, rename, delete, undo/redo, save (Ctrl S), validation with per-step issues, activation confirm, unsaved-change protection, live test runs |
-| Triggers | Manual, schedule (≥ 5 min), webhook (secret URL, regenerable) |
+| Triggers | Manual, schedule (≥ 5 min), webhook (secret URL, regenerable, optional HMAC-SHA256 signatures) |
 | Steps | HTTP request (SSRF-guarded, retries, timeouts), transform, condition (true/false branches), email via SMTP, Slack incoming webhook |
-| Execution | Celery worker, per-step records (status, attempts, output, error, timing), cancellation, re-run, time limits, stale-run reaper, per-user concurrency limit |
+| Execution | Celery worker, per-step records (status, attempts, output, error, timing), cancellation, re-run, time limits, stale-run reaper, per-user concurrency limit, 90-day retention |
 | Monitoring | Dashboard metrics from real data, 14-day trend, health summary, execution history with filters, notifications |
 | Integrations | SMTP, Slack, HTTP credentials — secrets encrypted with Fernet, never returned |
 | Templates | 5 templates, all valid against the implemented step types |
-| Settings | Profile, password, sessions, notification and appearance preferences, activity log |
+| Settings | Profile, email, password, sessions, notification and appearance preferences, activity log, account deletion |
+| Mobile app | Sign in/up, dashboard, workflows (run/activate/pause), live run detail, cancel/re-run, alerts, settings, sessions |
 
 **Not implemented (shown as "Planned" in the UI):** Google Workspace and GitHub
-integrations, team workspaces, billing, the Flutter mobile app.
+integrations, team workspaces, billing, push notifications.
 
 GhostWork has **not** been hardened or load-tested for production use; see
 [Production checklist](#production-checklist).
@@ -56,19 +63,14 @@ cd backend
 cp .env.example .env                # first time only; fill JWT_SECRET_KEY, INTEGRATION_ENCRYPTION_KEY,
                                     # and make DATABASE_URL's password match the root .env
 python -m venv .venv                # only if .venv doesn't exist
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m alembic upgrade head
+.venv/bin/pip install -r requirements.txt
+.venv/bin/alembic upgrade head
 
 # three terminals:
-.venv/bin/python -m uvicorn app.main:app --reload --port 8000
-.venv/bin/python -m celery -A app.workers.celery_app worker --loglevel=info
-.venv/bin/python -m celery -A app.workers.celery_app beat --loglevel=info
+.venv/bin/uvicorn app.main:app --reload --port 8000
+.venv/bin/celery -A app.workers.celery_app worker --loglevel=info
+.venv/bin/celery -A app.workers.celery_app beat --loglevel=info
 ```
-
-> **Note:** always run tools as `.venv/bin/python -m <tool>`. The existing venv was
-> created when the folder was named `GhostWork`, so its console scripts
-> (`.venv/bin/alembic`, `.venv/bin/uvicorn`, …) point at a path that no longer exists.
-> `python -m` is unaffected. Recreating the venv also fixes it.
 
 API docs: <http://localhost:8000/docs>
 
@@ -80,6 +82,24 @@ cp .env.example .env.local          # NEXT_PUBLIC_API_BASE_URL=http://localhost:
 npm install
 npm run dev                         # http://localhost:3000
 ```
+
+### 4. Mobile app (Flutter)
+
+Flutter is installed at `~/development/flutter` (add `~/development/flutter/bin` to your `PATH`).
+
+```bash
+cd mobile
+flutter pub get
+flutter test && flutter analyze
+
+# In Chrome (no Android/iOS tooling needed). Port 8090 is in the dev CORS allow-list.
+flutter run -d chrome --web-port 8090 --dart-define=API_BASE_URL=http://localhost:8000
+
+# Android emulator (needs Android Studio + SDK): the host machine is 10.0.2.2
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000 --dart-define=WEB_APP_URL=http://10.0.2.2:3000
+```
+
+iOS builds require macOS with Xcode. Release builds should point `API_BASE_URL` at your HTTPS API.
 
 ### Everything in containers (optional)
 
@@ -95,17 +115,23 @@ Stop any locally running API/web servers first (ports 8000 and 3000).
 ## Testing
 
 ```bash
-# Backend: 53 tests against a real PostgreSQL test database (ghostwork_test)
+# Backend: 59 tests against a real PostgreSQL test database (ghostwork_test)
 docker exec ghostwork-db psql -U ghostwork -d ghostwork -c "CREATE DATABASE ghostwork_test OWNER ghostwork;"  # once
-cd backend && .venv/bin/python -m pytest -q
+cd backend && .venv/bin/pytest -q
 
 # Frontend: type check, lint, production build
 cd frontend && npm run typecheck && npm run lint && npm run build
 
 # End-to-end (Playwright) — needs the API and a Celery worker running
 cd frontend && npx playwright install chromium   # once
-npm run test:e2e
+npm run test:e2e                                  # 15 tests (desktop + mobile viewport)
+
+# Mobile: 18 tests (models, API client auth flow, widgets, sign-in flow)
+cd mobile && flutter test
 ```
+
+CI (`.github/workflows/ci.yml`) runs the backend tests with migration checks and the
+frontend type check, lint and build on every push and pull request.
 
 The e2e suite registers fresh accounts, so the development `backend/.env` raises
 `REGISTER_RATE_LIMIT_PER_HOUR`. Production keeps the defaults (5/hour, 10 logins/5 min).
@@ -195,8 +221,15 @@ Before exposing GhostWork publicly:
 
 ---
 
-## Mobile (Flutter) — phase two
+## Mobile (Flutter)
 
-The API was designed so a Flutter app can use it unchanged; see
-[`docs/mobile-flutter.md`](docs/mobile-flutter.md) for the plan and API contract.
-The Flutter app itself has not been built yet.
+`mobile/` is a Flutter app for monitoring and quick actions; building workflows stays on
+the web. It uses the API's mobile auth mode (refresh token in the request body, stored in
+the Keychain/Keystore, rotated on every refresh). See [`docs/mobile-flutter.md`](docs/mobile-flutter.md).
+
+## Legal
+
+The Terms of Service (`frontend/src/lib/terms.ts`, shown at `/terms` and during sign-up) and
+Privacy page are written in plain language for GhostWork's actual behavior. They have not
+been reviewed by a lawyer; have them reviewed before offering GhostWork to the public, and
+bump `TERMS_VERSION` (frontend and `backend/app/core/config.py`) whenever they change.
