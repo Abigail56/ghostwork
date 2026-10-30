@@ -142,23 +142,19 @@ def test_templates_are_valid_definitions(client, auth):
     from app.services.workflow_definition import validate_definition
     import uuid
 
+    providers = {"action.email": "smtp", "action.slack": "slack", "action.github_issue": "github",
+                 "action.sheets_append": "google", "action.sheets_read": "google"}
+    fake_ids = {name: uuid.uuid4() for name in set(providers.values())}
+    connected = {fake_id: name for name, fake_id in fake_ids.items()}
     for template in TEMPLATES:
-        fake = {}
-        definition = template.definition
-        for n in definition["nodes"]:
-            if n["type"] in ("action.email", "action.slack"):
-                fake_id = uuid.uuid4()
-                fake[fake_id] = "smtp" if n["type"] == "action.email" else "slack"
-                n = {**n, "config": {**n["config"], "integration_id": str(fake_id)}}
         patched = {
-            **definition,
+            **template.definition,
             "nodes": [
-                {**n, "config": {**n["config"], "integration_id": str(next(k for k, v in fake.items() if v == ("smtp" if n["type"] == "action.email" else "slack")))}}
-                if n["type"] in ("action.email", "action.slack") else n
-                for n in definition["nodes"]
+                {**n, "config": {**n["config"], "integration_id": str(fake_ids[providers[n["type"]]])}} if n["type"] in providers else n
+                for n in template.definition["nodes"]
             ],
         }
-        result = validate_definition(patched, fake)
+        result = validate_definition(patched, connected)
         assert result.valid, (template.slug, [i.message for i in result.issues])
 
     used = client.post("/api/v1/templates/scheduled-data-pull/use", headers=auth, json={}).json()
@@ -168,4 +164,5 @@ def test_templates_are_valid_definitions(client, auth):
 def test_node_catalog(client):
     types = {n["type"] for n in client.get("/api/v1/node-types").json()}
     assert types == {"trigger.manual", "trigger.schedule", "trigger.webhook", "action.http_request",
-                     "action.transform", "action.email", "action.slack", "condition.if"}
+                     "action.transform", "action.email", "action.slack", "action.github_issue",
+                     "action.sheets_append", "action.sheets_read", "condition.if"}

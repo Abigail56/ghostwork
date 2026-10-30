@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from app.core.security import decrypt_secrets, encrypt_secrets
 from app.models import Integration
 from app.models.base import utcnow
-from app.services import net_guard
+from app.services import external_apis, net_guard
 from app.services.mailer import MailError, SmtpConfig, verify_smtp
 
 
@@ -48,6 +48,14 @@ class HttpAuthInput(_Strict):
     token: str = Field(min_length=1, max_length=4000)
 
 
+class GitHubInput(_Strict):
+    token: str = Field(min_length=1, max_length=500)
+
+
+class GoogleInput(_Strict):
+    service_account_json: str = Field(min_length=1, max_length=20_000)
+
+
 @dataclass(frozen=True)
 class Provider:
     key: str
@@ -83,11 +91,31 @@ def _verify_smtp(public: dict, secrets: dict) -> None:
         raise IntegrationError(str(exc))
 
 
+def _verify_github(public: dict, secrets: dict) -> None:
+    try:
+        account = external_apis.github_request(secrets["token"], "GET", "/user")
+    except external_apis.ExternalApiError as exc:
+        raise IntegrationError(str(exc))
+    public["account"] = account.get("login") if isinstance(account, dict) else None
+
+
+def _verify_google(public: dict, secrets: dict) -> None:
+    try:
+        info = external_apis.parse_service_account(secrets["service_account_json"])
+        external_apis.google_access_token(info, external_apis.SHEETS_SCOPE)
+    except external_apis.ExternalApiError as exc:
+        raise IntegrationError(str(exc))
+    # The email is shown so the user knows who to share spreadsheets with.
+    public["service_account"] = info["client_email"]
+
+
 PROVIDERS: dict[str, Provider] = {
     "smtp": Provider("smtp", "Email (SMTP)", SmtpInput, ("password",), _verify_smtp),
     # Slack has no side-effect-free check for incoming webhooks; the URL shape is validated.
     "slack": Provider("slack", "Slack", SlackInput, ("webhook_url",), None),
     "http_auth": Provider("http_auth", "HTTP credential", HttpAuthInput, ("token",), None),
+    "github": Provider("github", "GitHub", GitHubInput, ("token",), _verify_github),
+    "google": Provider("google", "Google Sheets", GoogleInput, ("service_account_json",), _verify_google),
 }
 
 

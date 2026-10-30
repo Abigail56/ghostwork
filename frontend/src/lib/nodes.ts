@@ -1,5 +1,8 @@
 import {
   CalendarClock,
+  CircleDot,
+  FileSpreadsheet,
+  TableProperties,
   GitBranch,
   Globe,
   Hand,
@@ -28,6 +31,9 @@ export const NODE_ICONS: Record<string, LucideIcon> = {
   "action.transform": Shuffle,
   "action.email": Mail,
   "action.slack": MessageSquare,
+  "action.github_issue": CircleDot,
+  "action.sheets_append": FileSpreadsheet,
+  "action.sheets_read": TableProperties,
   "condition.if": GitBranch,
 };
 
@@ -35,6 +41,8 @@ export const PROVIDER_ICONS: Record<string, LucideIcon> = {
   smtp: Mail,
   slack: MessageSquare,
   http_auth: KeyRound,
+  github: CircleDot,
+  google: FileSpreadsheet,
 };
 
 export function kindOf(type: string): NodeKind {
@@ -84,6 +92,11 @@ export function summarize(node: Pick<NodeDefinition, "type" | "config">): string
     }
     case "action.slack":
       return c.text ? String(c.text).slice(0, 60) : "Message not set";
+    case "action.github_issue":
+      return c.repository ? `Issue in ${c.repository}` : "Repository not set";
+    case "action.sheets_append":
+    case "action.sheets_read":
+      return c.spreadsheet_id ? `${node.type.endsWith("append") ? "Add row to" : "Read"} ${c.sheet_range || "Sheet1"}` : "Spreadsheet not set";
     case "condition.if":
       return c.left
         ? `${String(c.left).replace(/\{\{\s*|\s*\}\}/g, "")} ${OPERATOR_LABEL[String(c.operator)] ?? ""} ${

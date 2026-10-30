@@ -44,6 +44,21 @@ class Notification(SQLModel, table=True):
     created_at: datetime = created_at_field(index=True)
 
 
+class PushSubscription(SQLModel, table=True):
+    """A device that receives push notifications: a Web Push endpoint or an FCM token."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        sa_column=Column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    )
+    kind: str = Field(max_length=16)  # webpush | fcm
+    endpoint: str = Field(sa_column=Column(Text, unique=True, nullable=False))
+    keys: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    created_at: datetime = created_at_field()
+
+
 class ActivityEvent(SQLModel, table=True):
     """Audit trail of things a user did (shown as recent activity)."""
 

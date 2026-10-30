@@ -6,7 +6,7 @@ from app.models.execution import (
     StepStatus,
     WorkflowExecution,
 )
-from app.models.integration import ActivityEvent, Integration, Notification
+from app.models.integration import ActivityEvent, Integration, Notification, PushSubscription
 from app.models.user import PasswordResetToken, RefreshSession, User
 from app.models.workflow import Workflow, WorkflowStatus
 
@@ -19,6 +19,7 @@ __all__ = [
     "Integration",
     "Notification",
     "PasswordResetToken",
+    "PushSubscription",
     "RefreshSession",
     "StepStatus",
     "User",

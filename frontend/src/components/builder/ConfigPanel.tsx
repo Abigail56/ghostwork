@@ -346,6 +346,41 @@ export function ConfigPanel({
           </>
         )}
 
+        {data.type === "action.github_issue" && (
+          <>
+            <IntegrationSelect label="GitHub connection" provider="github" integrations={integrations} value={c.integration_id as string | null} onChange={(v) => set({ integration_id: v })} error={issueFor(issues, "integration_id")} />
+            <Field label="Repository" error={issueFor(issues, "repository")} hint="In owner/name form.">
+              {(p) => <Input {...p} value={String(c.repository ?? "")} placeholder="octocat/hello-world" className="font-mono text-meta" onChange={(e) => set({ repository: e.target.value })} />}
+            </Field>
+            <Field label="Title" error={issueFor(issues, "title")}>
+              {(p) => <Input {...p} value={String(c.title ?? "")} onChange={(e) => set({ title: e.target.value })} />}
+            </Field>
+            <Field label="Body" optional error={issueFor(issues, "body")}>
+              {(p) => <Textarea {...p} rows={5} value={String(c.body ?? "")} onChange={(e) => set({ body: e.target.value })} />}
+            </Field>
+            <Field label="Labels" optional hint="Separate labels with commas.">
+              {(p) => <Input {...p} value={((c.labels as string[]) ?? []).join(", ")} onChange={(e) => set({ labels: e.target.value.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 20) })} />}
+            </Field>
+          </>
+        )}
+
+        {(data.type === "action.sheets_append" || data.type === "action.sheets_read") && (
+          <>
+            <IntegrationSelect label="Google connection" provider="google" integrations={integrations} value={c.integration_id as string | null} onChange={(v) => set({ integration_id: v })} error={issueFor(issues, "integration_id")} />
+            <Field label="Spreadsheet ID" error={issueFor(issues, "spreadsheet_id")} hint="From the sheet's URL. Share the sheet with the service account's email.">
+              {(p) => <Input {...p} value={String(c.spreadsheet_id ?? "")} className="font-mono text-meta" onChange={(e) => set({ spreadsheet_id: e.target.value })} />}
+            </Field>
+            <Field label="Sheet or range" error={issueFor(issues, "sheet_range")}>
+              {(p) => <Input {...p} value={String(c.sheet_range ?? "Sheet1")} placeholder="Sheet1" className="font-mono text-meta" onChange={(e) => set({ sheet_range: e.target.value })} />}
+            </Field>
+            {data.type === "action.sheets_append" && (
+              <Field label="Column values" error={issueFor(issues, "values")} hint="One per line, left to right.">
+                {(p) => <Textarea {...p} rows={4} value={((c.values as string[]) ?? []).join("\n")} className="font-mono text-meta" onChange={(e) => set({ values: e.target.value.split("\n").slice(0, 50) })} />}
+              </Field>
+            )}
+          </>
+        )}
+
         {data.type === "condition.if" && (
           <>
             <Field label="Value" error={issueFor(issues, "left")}>

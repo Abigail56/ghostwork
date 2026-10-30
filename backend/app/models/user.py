@@ -20,6 +20,7 @@ class User(SQLModel, table=True):
     notify_on_failure: bool = Field(default=True)
     notify_on_success: bool = Field(default=False)
     email_on_failure: bool = Field(default=False)
+    push_on_failure: bool = Field(default=True)
 
     # Appearance preferences
     reduce_motion: str = Field(default="system", max_length=10)  # system | reduce | full

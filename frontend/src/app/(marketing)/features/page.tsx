@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarClock, GitBranch, Globe, Hand, Mail, MessageSquare, Shuffle, Webhook } from "lucide-react";
+import { CalendarClock, CircleDot, FileSpreadsheet, GitBranch, Globe, Hand, Mail, MessageSquare, Shuffle, Webhook } from "lucide-react";
 import { PageIntro, Section } from "@/components/marketing/Section";
 import { ButtonLink } from "@/components/ui/Button";
 
@@ -17,9 +17,11 @@ const ACTIONS = [
   { icon: GitBranch, name: "Condition", body: "Compare values with equals, contains, greater than, is empty and more. Continue down the true or false branch." },
   { icon: Mail, name: "Send email", body: "Deliver email through an SMTP server you connect. Recipients, subject and body support references." },
   { icon: MessageSquare, name: "Slack message", body: "Post to a channel through a Slack incoming webhook." },
+  { icon: CircleDot, name: "GitHub issue", body: "Create an issue in a repository with a personal access token." },
+  { icon: FileSpreadsheet, name: "Google Sheets", body: "Append or read rows through a Google service account." },
 ];
 
-const PLANNED = ["Google Workspace actions", "GitHub events", "Push notifications", "Team workspaces and shared workflows"];
+const PLANNED = ["Team workspaces and shared workflows", "GitHub and Google sign-in with OAuth"];
 
 export default function FeaturesPage() {
   return (
@@ -60,7 +62,7 @@ export default function FeaturesPage() {
             "Re-run any execution with the same trigger data",
             "Cancel queued or running executions",
             "Dashboard metrics computed from your real runs",
-            "In-app notifications for failures (and optionally successes)",
+            "In-app and push notifications for failures (and optionally in-app for successes)",
             "Workflow templates for common jobs",
           ].map((item) => (
             <li key={item} className="flex gap-2.5 rounded-lg border border-line-subtle bg-surface px-4 py-3">

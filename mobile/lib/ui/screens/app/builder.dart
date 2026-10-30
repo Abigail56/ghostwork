@@ -26,6 +26,9 @@ const _slugs = {
   'action.transform': 'transform',
   'action.email': 'email',
   'action.slack': 'slack',
+  'action.github_issue': 'github',
+  'action.sheets_append': 'sheet',
+  'action.sheets_read': 'sheet',
   'condition.if': 'condition',
 };
 
@@ -40,7 +43,10 @@ String nextNodeId(String type, Iterable<NodeDef> existing) {
 /// Key-order-independent JSON for dirty detection (PostgreSQL JSONB reorders keys).
 String canonicalJson(Object? value) {
   Object? canon(Object? v) => switch (v) {
-    Map m => {for (final k in (m.keys.map((k) => '$k').toList()..sort())) k: canon(m[k])},
+    Map m => {
+      for (final k in (m.keys.map((k) => '$k').toList()..sort()))
+        k: canon(m[k]),
+    },
     List l => l.map(canon).toList(),
     double d when d == d.roundToDouble() => d.toInt(),
     _ => v,
@@ -53,7 +59,9 @@ bool canConnect(Definition d, String source, String handle, String target) {
   if (source == target) return false;
   final t = d.nodes.where((n) => n.id == target).firstOrNull;
   if (t == null || t.kind == 'trigger') return false;
-  return !d.edges.any((e) => e.source == source && e.target == target && e.handle == handle);
+  return !d.edges.any(
+    (e) => e.source == source && e.target == target && e.handle == handle,
+  );
 }
 
 class BuilderLoader extends ConsumerWidget {
@@ -68,7 +76,11 @@ class BuilderLoader extends ConsumerWidget {
         skipLoadingOnRefresh: true,
         loading: () => const GwLoading(rows: 4, label: 'Loading builder'),
         error: (e, _) => Center(
-          child: GwError(title: "Couldn't open the builder", error: e, onRetry: () => ref.invalidate(workflowProvider(id))),
+          child: GwError(
+            title: "Couldn't open the builder",
+            error: e,
+            onRetry: () => ref.invalidate(workflowProvider(id)),
+          ),
         ),
         // Keyed by id so switching workflows resets editor state; later refetches don't overwrite local edits.
         data: (w) => BuilderScreen(key: ValueKey(w.id), workflow: w),
@@ -85,7 +97,9 @@ class BuilderScreen extends ConsumerStatefulWidget {
 
 class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   late Workflow _saved = widget.workflow;
-  late Definition _def = Definition.fromJson(widget.workflow.definition.toJson());
+  late Definition _def = Definition.fromJson(
+    widget.workflow.definition.toJson(),
+  );
   String? _selected;
   final _canvas = FlowCanvasController();
 
@@ -104,7 +118,8 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   Timer? _poll;
   bool _runCollapsed = false;
 
-  List<Integration> get _integrations => ref.read(integrationsProvider).value ?? const [];
+  List<Integration> get _integrations =>
+      ref.read(integrationsProvider).value ?? const [];
 
   @override
   void initState() {
@@ -114,9 +129,11 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
     ref.read(integrationsProvider);
   }
 
-  bool get _dirty => canonicalJson(_def.toJson()) != canonicalJson(_saved.definition.toJson());
+  bool get _dirty =>
+      canonicalJson(_def.toJson()) != canonicalJson(_saved.definition.toJson());
   List<ValidationIssue> get _issues => _saved.validation;
-  NodeDef? get _selectedNode => _def.nodes.where((n) => n.id == _selected).firstOrNull;
+  NodeDef? get _selectedNode =>
+      _def.nodes.where((n) => n.id == _selected).firstOrNull;
 
   @override
   void dispose() {
@@ -132,7 +149,10 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   void _change(Definition next, {bool immediateHistory = false}) {
     // Typing is grouped into one undo step; structural edits are always their own step.
     if (immediateHistory && _hasPendingEdit) {
-      _history = [..._history.sublist(0, _cursor + 1), jsonEncode(_def.toJson())];
+      _history = [
+        ..._history.sublist(0, _cursor + 1),
+        jsonEncode(_def.toJson()),
+      ];
       _cursor = _history.length - 1;
     }
     setState(() => _def = next);
@@ -143,12 +163,16 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
       if (_history[_cursor] == json) return;
       setState(() {
         _history = [..._history.sublist(0, _cursor + 1), json];
-        if (_history.length > 100) _history = _history.sublist(_history.length - 100);
+        if (_history.length > 100) {
+          _history = _history.sublist(_history.length - 100);
+        }
         _cursor = _history.length - 1;
       });
     }
 
-    immediateHistory ? push() : _historyTimer = Timer(const Duration(milliseconds: 400), push);
+    immediateHistory
+        ? push()
+        : _historyTimer = Timer(const Duration(milliseconds: 400), push);
   }
 
   // An edit may not be in the history yet (debounced), so it counts as undoable too.
@@ -159,7 +183,10 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
     _historyTimer?.cancel();
     if (_hasPendingEdit) {
       // Record the pending edit first, so undo steps back exactly one change.
-      _history = [..._history.sublist(0, _cursor + 1), jsonEncode(_def.toJson())];
+      _history = [
+        ..._history.sublist(0, _cursor + 1),
+        jsonEncode(_def.toJson()),
+      ];
       _cursor = _history.length - 1;
     }
     if (_cursor > 0) _restore(_cursor - 1);
@@ -168,26 +195,43 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   void _restore(int cursor) {
     setState(() {
       _cursor = cursor;
-      _def = Definition.fromJson(jsonDecode(_history[cursor]) as Map<String, dynamic>);
+      _def = Definition.fromJson(
+        jsonDecode(_history[cursor]) as Map<String, dynamic>,
+      );
       _selected = null;
     });
     _rev.value++;
   }
 
-  void _updateNode(String id, NodeDef Function(NodeDef) f) =>
-      _change(Definition(nodes: [for (final n in _def.nodes) n.id == id ? f(n) : n], edges: _def.edges));
+  void _updateNode(String id, NodeDef Function(NodeDef) f) => _change(
+    Definition(
+      nodes: [for (final n in _def.nodes) n.id == id ? f(n) : n],
+      edges: _def.edges,
+    ),
+  );
 
   void _addNode(NodeType type, {Offset? at}) {
     final trigger = _def.nodes.where((n) => n.kind == 'trigger').firstOrNull;
     if (type.kind == 'trigger' && trigger != null) {
       // One trigger per workflow: swap its type in place and keep its connections.
-      _updateNode(trigger.id, (n) => n.copyWith(type: type.type, name: type.label, config: Map.of(type.defaultConfig)));
+      _updateNode(
+        trigger.id,
+        (n) => n.copyWith(
+          type: type.type,
+          name: type.label,
+          config: Map.of(type.defaultConfig),
+        ),
+      );
       setState(() => _selected = trigger.id);
       toast(context, 'Trigger changed to ${type.label}', tone: AlertTone.info);
       return;
     }
     final id = nextNodeId(type.type, _def.nodes);
-    final anchor = _selectedNode ?? (_def.nodes.isEmpty ? null : (List.of(_def.nodes)..sort((a, b) => b.y.compareTo(a.y))).first);
+    final anchor =
+        _selectedNode ??
+        (_def.nodes.isEmpty
+            ? null
+            : (List.of(_def.nodes)..sort((a, b) => b.y.compareTo(a.y))).first);
     final node = NodeDef(
       id: id,
       type: type.type,
@@ -198,10 +242,18 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
     );
     final edges = [..._def.edges];
     // Adding continues the flow from the selected (or last) step.
-    if (at == null && anchor != null && type.kind != 'trigger' && anchor.kind != 'condition') {
-      edges.add(EdgeDef(id: 'e_${anchor.id}_out_$id', source: anchor.id, target: id));
+    if (at == null &&
+        anchor != null &&
+        type.kind != 'trigger' &&
+        anchor.kind != 'condition') {
+      edges.add(
+        EdgeDef(id: 'e_${anchor.id}_out_$id', source: anchor.id, target: id),
+      );
     }
-    _change(Definition(nodes: [..._def.nodes, node], edges: edges), immediateHistory: true);
+    _change(
+      Definition(nodes: [..._def.nodes, node], edges: edges),
+      immediateHistory: true,
+    );
     setState(() => _selected = id);
     WidgetsBinding.instance.addPostFrameCallback((_) => _canvas.fit());
   }
@@ -213,7 +265,12 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
         nodes: _def.nodes,
         edges: [
           ..._def.edges,
-          EdgeDef(id: 'e_${source}_${handle}_$target', source: source, target: target, handle: handle),
+          EdgeDef(
+            id: 'e_${source}_${handle}_$target',
+            source: source,
+            target: target,
+            handle: handle,
+          ),
         ],
       ),
       immediateHistory: true,
@@ -224,7 +281,12 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
     final id = _selected;
     if (id == null) return;
     _change(
-      Definition(nodes: _def.nodes.where((n) => n.id != id).toList(), edges: _def.edges.where((e) => e.source != id && e.target != id).toList()),
+      Definition(
+        nodes: _def.nodes.where((n) => n.id != id).toList(),
+        edges: _def.edges
+            .where((e) => e.source != id && e.target != id)
+            .toList(),
+      ),
       immediateHistory: true,
     );
     setState(() => _selected = null);
@@ -241,8 +303,15 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
       final p = stack.removeLast();
       if (seen.add(p)) stack.addAll(parents[p] ?? const []);
     }
-    final ancestors = _def.nodes.where((n) => seen.contains(n.id) && n.kind != 'trigger').map((n) => '{{ steps.${n.id} }}');
-    return ['{{ trigger.payload }}', ...ancestors, '{{ execution.id }}', '{{ workflow.name }}'];
+    final ancestors = _def.nodes
+        .where((n) => seen.contains(n.id) && n.kind != 'trigger')
+        .map((n) => '{{ steps.${n.id} }}');
+    return [
+      '{{ trigger.payload }}',
+      ...ancestors,
+      '{{ execution.id }}',
+      '{{ workflow.name }}',
+    ];
   }
 
   /* ---------------- Save, run, activate ---------------- */
@@ -250,7 +319,13 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   Future<Workflow?> _save({bool announce = false}) async {
     setState(() => _saving = true);
     try {
-      final result = await ref.read(apiClientProvider).updateWorkflow(_saved.id, definition: _def, expectedVersion: _saved.version);
+      final result = await ref
+          .read(apiClientProvider)
+          .updateWorkflow(
+            _saved.id,
+            definition: _def,
+            expectedVersion: _saved.version,
+          );
       setState(() {
         _saved = result;
         _def = Definition.fromJson(result.definition.toJson());
@@ -262,7 +337,9 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
         toast(
           context,
           'Workflow saved',
-          description: result.validation.isEmpty ? 'Ready to run.' : '${result.validation.length} issue(s) to fix before it can run.',
+          description: result.validation.isEmpty
+              ? 'Ready to run.'
+              : '${result.validation.length} issue(s) to fix before it can run.',
         );
       }
       return result;
@@ -271,7 +348,9 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
         toast(
           context,
           e.status == 409 ? 'Saved elsewhere' : "Couldn't save",
-          description: e.issues.isNotEmpty ? e.issues.take(2).join(' ') : e.message,
+          description: e.issues.isNotEmpty
+              ? e.issues.take(2).join(' ')
+              : e.message,
           tone: AlertTone.danger,
         );
       }
@@ -283,7 +362,9 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
 
   void _watchExecution(String id) {
     _poll?.cancel();
-    setState(() => (_executionId = id, _execution = null, _runCollapsed = false));
+    setState(
+      () => (_executionId = id, _execution = null, _runCollapsed = false),
+    );
     Future<void> tick() async {
       try {
         final e = await ref.read(apiClientProvider).execution(id);
@@ -326,13 +407,20 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                           Text('Test run', style: GwText.section),
                           const SizedBox(height: 4),
                           Text(
-                            _dirty ? 'Your changes will be saved first. The run uses the saved version.' : 'Run the saved workflow now and watch each step.',
+                            _dirty
+                                ? 'Your changes will be saved first. The run uses the saved version.'
+                                : 'Run the saved workflow now and watch each step.',
                             style: GwText.body.copyWith(color: Gw.fgMuted),
                           ),
                         ],
                       ),
                     ),
-                    GwIconButton(icon: Icons.close, tooltip: 'Close', size: 32, onPressed: () => Navigator.pop(ctx)),
+                    GwIconButton(
+                      icon: Icons.close,
+                      tooltip: 'Close',
+                      size: 32,
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
                   ],
                 ),
               ),
@@ -342,8 +430,17 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                   label: 'Test data (JSON)',
                   optional: true,
                   error: error,
-                  hint: const Text('Available to steps as {{ trigger.payload }}.'),
-                  child: GwInput(controller: payload, mono: true, maxLines: 5, minLines: 5, error: error != null, semanticLabel: 'Test data (JSON)'),
+                  hint: const Text(
+                    'Available to steps as {{ trigger.payload }}.',
+                  ),
+                  child: GwInput(
+                    controller: payload,
+                    mono: true,
+                    maxLines: 5,
+                    minLines: 5,
+                    error: error != null,
+                    semanticLabel: 'Test data (JSON)',
+                  ),
                 ),
               ),
               Container(
@@ -356,7 +453,10 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                   alignment: WrapAlignment.end,
                   spacing: 8,
                   children: [
-                    GwButton(label: 'Cancel', onPressed: () => Navigator.pop(ctx)),
+                    GwButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
                     GwButton(
                       label: 'Run now',
                       icon: Icons.play_arrow,
@@ -365,11 +465,17 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                       onPressed: () async {
                         Map<String, dynamic> data;
                         try {
-                          final parsed = payload.text.trim().isEmpty ? <String, dynamic>{} : jsonDecode(payload.text);
-                          if (parsed is! Map<String, dynamic>) throw const FormatException();
+                          final parsed = payload.text.trim().isEmpty
+                              ? <String, dynamic>{}
+                              : jsonDecode(payload.text);
+                          if (parsed is! Map<String, dynamic>) {
+                            throw const FormatException();
+                          }
                           data = parsed;
                         } catch (_) {
-                          setLocal(() => error = 'Test data must be a JSON object, like {"name": "Ada"}.');
+                          setLocal(
+                            () => error = 'Test data must be a JSON object, like {"name": "Ada"}.',
+                          );
                           return;
                         }
                         setLocal(() => (busy = true, error = null));
@@ -379,14 +485,26 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                           if (r == null) return setLocal(() => busy = false);
                           current = r;
                         }
-                        if (current.validation.isNotEmpty) return setLocal(() => (busy = false, error = 'Fix the validation issues before running.'));
+                        if (current.validation.isNotEmpty) {
+                          return setLocal(
+                            () => (
+                              busy = false,
+                              error =
+                                  'Fix the validation issues before running.',
+                            ),
+                          );
+                        }
                         try {
-                          final e = await ref.read(apiClientProvider).runWorkflow(current.id, data);
+                          final e = await ref
+                              .read(apiClientProvider)
+                              .runWorkflow(current.id, data);
                           ref.invalidate(executionsProvider);
                           if (ctx.mounted) Navigator.pop(ctx);
                           _watchExecution(e.id);
                         } catch (e) {
-                          setLocal(() => (busy = false, error = describeError(e)));
+                          setLocal(
+                            () => (busy = false, error = describeError(e)),
+                          );
                         }
                       },
                     ),
@@ -409,12 +527,18 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
     await confirmAction(
       context,
       title: 'Activate this workflow?',
-      description: _dirty ? 'Unsaved changes will be saved first. $description' : description,
+      description: _dirty
+          ? 'Unsaved changes will be saved first. $description'
+          : description,
       confirmLabel: 'Activate',
       action: () async {
-        if (_dirty && await _save() == null) return "Couldn't save your changes.";
+        if (_dirty && await _save() == null) {
+          return "Couldn't save your changes.";
+        }
         try {
-          final r = await ref.read(apiClientProvider).setWorkflowStatus(_saved.id, 'active');
+          final r = await ref
+              .read(apiClientProvider)
+              .setWorkflowStatus(_saved.id, 'active');
           setState(() => _saved = r);
           refreshWorkflowData(ref, r.id);
           if (mounted) toast(context, 'Workflow activated');
@@ -429,12 +553,21 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   Future<void> _pause() async {
     setState(() => _statusBusy = true);
     try {
-      final r = await ref.read(apiClientProvider).setWorkflowStatus(_saved.id, 'paused');
+      final r = await ref
+          .read(apiClientProvider)
+          .setWorkflowStatus(_saved.id, 'paused');
       setState(() => _saved = r);
       refreshWorkflowData(ref, r.id);
       if (mounted) toast(context, 'Workflow paused');
     } catch (e) {
-      if (mounted) toast(context, "Couldn't pause", description: describeError(e), tone: AlertTone.danger);
+      if (mounted) {
+        toast(
+          context,
+          "Couldn't pause",
+          description: describeError(e),
+          tone: AlertTone.danger,
+        );
+      }
     } finally {
       if (mounted) setState(() => _statusBusy = false);
     }
@@ -455,11 +588,16 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   /* ---------------- UI ---------------- */
 
   /// Uses its own Consumer: on phones it lives in a separate sheet route that must rebuild when data loads.
-  Widget _library() => Consumer(builder: (context, ref, _) {
-        final types = ref.watch(nodeTypesProvider).value;
-        final connected = (ref.watch(integrationsProvider).value ?? const <Integration>[]).map((i) => i.provider).toSet();
-        return _libraryFor(types, connected);
-      });
+  Widget _library() => Consumer(
+    builder: (context, ref, _) {
+      final types = ref.watch(nodeTypesProvider).value;
+      final connected =
+          (ref.watch(integrationsProvider).value ?? const <Integration>[])
+              .map((i) => i.provider)
+              .toSet();
+      return _libraryFor(types, connected);
+    },
+  );
 
   Widget _libraryFor(List<NodeType>? types, Set<String> connected) {
     return NodeLibrary(
@@ -482,21 +620,37 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
     return ConfigPanel(
       key: ValueKey(node.id),
       node: node,
-      issues: _dirty ? const [] : _issues.where((i) => i.nodeId == node.id).toList(),
+      issues: _dirty
+          ? const []
+          : _issues.where((i) => i.nodeId == node.id).toList(),
       integrations: _integrations,
       references: _references(node.id),
       webhookUrl: _saved.webhookUrl,
       connections: [
-        for (final e in _def.edges.where((e) => e.source == node.id || e.target == node.id))
-          (e, e.source == node.id ? '→ ${names[e.target]}${e.handle == 'out' ? '' : ' (${e.handle})'}' : '← ${names[e.source]}'),
+        for (final e in _def.edges.where(
+          (e) => e.source == node.id || e.target == node.id,
+        ))
+          (
+            e,
+            e.source == node.id
+                ? '→ ${names[e.target]}${e.handle == 'out' ? '' : ' (${e.handle})'}'
+                : '← ${names[e.source]}',
+          ),
       ],
-      onChange: (config) => _updateNode(node.id, (n) => n.copyWith(config: config)),
+      onChange: (config) =>
+          _updateNode(node.id, (n) => n.copyWith(config: config)),
       onRename: (name) => _updateNode(node.id, (n) => n.copyWith(name: name)),
       onDelete: () {
         if (inSheet) Navigator.of(context).maybePop();
         _deleteSelected();
       },
-      onRemoveConnection: (edge) => _change(Definition(nodes: _def.nodes, edges: _def.edges.where((e) => e.id != edge.id).toList()), immediateHistory: true),
+      onRemoveConnection: (edge) => _change(
+        Definition(
+          nodes: _def.nodes,
+          edges: _def.edges.where((e) => e.id != edge.id).toList(),
+        ),
+        immediateHistory: true,
+      ),
     );
   }
 
@@ -515,11 +669,17 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
         ],
       ),
       const SizedBox(height: 16),
-      Text('Select a step to configure it. Rename the workflow or edit its description on the workflow page.', style: GwText.body.copyWith(color: Gw.fgMuted)),
+      Text(
+        'Select a step to configure it. Rename the workflow or edit its description on the workflow page.',
+        style: GwText.body.copyWith(color: Gw.fgMuted),
+      ),
       const SizedBox(height: 16),
       Text.rich(
         TextSpan(
-          style: GwText.meta.copyWith(color: Gw.fgSecondary, fontWeight: FontWeight.w500),
+          style: GwText.meta.copyWith(
+            color: Gw.fgSecondary,
+            fontWeight: FontWeight.w500,
+          ),
           children: [
             const TextSpan(text: 'Validation '),
             if (_dirty) TextSpan(text: '(as of last save)', style: GwText.meta),
@@ -532,7 +692,10 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
           children: [
             const Icon(Icons.check_circle_outline, size: 15, color: Gw.success),
             const SizedBox(width: 6),
-            Text('No issues found.', style: GwText.body.copyWith(color: Gw.success)),
+            Text(
+              'No issues found.',
+              style: GwText.body.copyWith(color: Gw.success),
+            ),
           ],
         )
       else
@@ -544,14 +707,22 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                   ? null
                   : () {
                       setState(() => _selected = i.nodeId);
-                      if (inSheet) Navigator.of(context).maybePop().then((_) => _openConfigSheet());
+                      if (inSheet) {
+                        Navigator.of(context)
+                            .maybePop()
+                            .then((_) => _openConfigSheet());
+                      }
                     },
               child: GwAlert(
                 tone: AlertTone.warning,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.error_outline, size: 14, color: Gw.warningText),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 14,
+                      color: Gw.warningText,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(child: Text(i.message)),
                   ],
@@ -567,19 +738,33 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
           children: [
             Text(
               'Shortcuts',
-              style: GwText.meta.copyWith(color: Gw.fgSecondary, fontWeight: FontWeight.w500),
+              style: GwText.meta.copyWith(
+                color: Gw.fgSecondary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 6),
-            Text('Ctrl S save · Ctrl Z undo · Ctrl Shift Z redo', style: GwText.meta),
+            Text(
+              'Ctrl S save · Ctrl Z undo · Ctrl Shift Z redo',
+              style: GwText.meta,
+            ),
             Text('Delete remove the selected step', style: GwText.meta),
-            Text('Drag a step to move it; drag from a bottom handle onto another step to connect them.', style: GwText.meta),
+            Text(
+              'Drag a step to move it; drag from a bottom handle onto another step to connect them.',
+              style: GwText.meta,
+            ),
           ],
         ),
       ),
     ],
   );
 
-  void _openLibrarySheet() => showSideSheet(context, title: 'Add a step', left: true, builder: (_) => _library());
+  void _openLibrarySheet() => showSideSheet(
+    context,
+    title: 'Add a step',
+    left: true,
+    builder: (_) => _library(),
+  );
 
   void _openConfigSheet() => showSideSheet(
     context,
@@ -591,14 +776,19 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
   Widget build(BuildContext context) {
     ref.watch(integrationsProvider); // keep the inline config panel fresh
     final wide = MediaQuery.of(context).size.width >= 1024;
-    final running = _execution?.isActive ?? (_executionId != null && _execution == null);
+    final running =
+        _execution?.isActive ?? (_executionId != null && _execution == null);
     final issueCounts = <String, int>{};
     if (!_dirty) {
       for (final i in _issues) {
-        if (i.nodeId != null) issueCounts[i.nodeId!] = (issueCounts[i.nodeId!] ?? 0) + 1;
+        if (i.nodeId != null) {
+          issueCounts[i.nodeId!] = (issueCounts[i.nodeId!] ?? 0) + 1;
+        }
       }
     }
-    final steps = {for (final s in _execution?.steps ?? const <ExecutionStep>[]) s.nodeId: s};
+    final steps = {
+      for (final s in _execution?.steps ?? const <ExecutionStep>[]) s.nodeId: s,
+    };
 
     final validationPill = _dirty
         ? Row(
@@ -607,7 +797,10 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
               Container(
                 width: 6,
                 height: 6,
-                decoration: const BoxDecoration(color: Gw.warning, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: Gw.warning,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 6),
               Text('Unsaved changes', style: GwText.meta),
@@ -624,25 +817,44 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
               children: [
                 const Icon(Icons.error_outline, size: 14, color: Gw.warning),
                 const SizedBox(width: 6),
-                Text('${_issues.length} issue${_issues.length > 1 ? 's' : ''}', style: GwText.meta.copyWith(color: Gw.warning)),
+                Text(
+                  '${_issues.length} issue${_issues.length > 1 ? 's' : ''}',
+                  style: GwText.meta.copyWith(color: Gw.warning),
+                ),
               ],
             ),
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle_outline, size: 14, color: Gw.success),
+              const Icon(
+                Icons.check_circle_outline,
+                size: 14,
+                color: Gw.success,
+              ),
               const SizedBox(width: 6),
-              Text('Saved · valid', style: GwText.meta.copyWith(color: Gw.success)),
+              Text(
+                'Saved · valid',
+                style: GwText.meta.copyWith(color: Gw.success),
+              ),
             ],
           );
 
     final shortcuts = <ShortcutActivator, VoidCallback>{
-      const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => _dirty && !_saving ? _save(announce: true) : null,
-      const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _dirty && !_saving ? _save(announce: true) : null,
-      const SingleActivator(LogicalKeyboardKey.keyZ, control: true): () => _canUndo ? _undo() : null,
-      const SingleActivator(LogicalKeyboardKey.keyZ, control: true, shift: true): () => _cursor < _history.length - 1 ? _restore(_cursor + 1) : null,
-      const SingleActivator(LogicalKeyboardKey.keyY, control: true): () => _cursor < _history.length - 1 ? _restore(_cursor + 1) : null,
+      const SingleActivator(LogicalKeyboardKey.keyS, control: true): () =>
+          _dirty && !_saving ? _save(announce: true) : null,
+      const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () =>
+          _dirty && !_saving ? _save(announce: true) : null,
+      const SingleActivator(LogicalKeyboardKey.keyZ, control: true): () =>
+          _canUndo ? _undo() : null,
+      const SingleActivator(
+        LogicalKeyboardKey.keyZ,
+        control: true,
+        shift: true,
+      ): () =>
+          _cursor < _history.length - 1 ? _restore(_cursor + 1) : null,
+      const SingleActivator(LogicalKeyboardKey.keyY, control: true): () =>
+          _cursor < _history.length - 1 ? _restore(_cursor + 1) : null,
       const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
       const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
     };
@@ -678,18 +890,29 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                         if (wide) ...[
                           InkWell(
                             onTap: () => _navigate('/workflows'),
-                            child: Text('Workflows', style: GwText.body.copyWith(color: Gw.fgMuted)),
+                            child: Text(
+                              'Workflows',
+                              style: GwText.body.copyWith(color: Gw.fgMuted),
+                            ),
                           ),
-                          const Icon(Icons.chevron_right, size: 14, color: Gw.fgMuted),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 14,
+                            color: Gw.fgMuted,
+                          ),
                         ],
                         ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: wide ? 320 : 200),
+                          constraints: BoxConstraints(
+                            maxWidth: wide ? 320 : 200,
+                          ),
                           child: InkWell(
                             onTap: () => _navigate('/workflows/${_saved.id}'),
                             child: Text(
                               _saved.name,
                               overflow: TextOverflow.ellipsis,
-                              style: GwText.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                              style: GwText.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -703,24 +926,58 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       runSpacing: 6,
                       children: [
-                        GwIconButton(icon: Icons.undo, tooltip: 'Undo', size: 32, onPressed: _canUndo ? _undo : null),
+                        GwIconButton(
+                          icon: Icons.undo,
+                          tooltip: 'Undo',
+                          size: 32,
+                          onPressed: _canUndo ? _undo : null,
+                        ),
                         GwIconButton(
                           icon: Icons.redo,
                           tooltip: 'Redo',
                           size: 32,
-                          onPressed: _cursor < _history.length - 1 ? () => _restore(_cursor + 1) : null,
+                          onPressed: _cursor < _history.length - 1
+                              ? () => _restore(_cursor + 1)
+                              : null,
                         ),
-                        Container(width: 1, height: 20, color: Gw.line, margin: const EdgeInsets.symmetric(horizontal: 4)),
-                        GwIconButton(icon: Icons.remove, tooltip: 'Zoom out', size: 32, onPressed: _canvas.zoomOut),
-                        GwIconButton(icon: Icons.add, tooltip: 'Zoom in', size: 32, onPressed: _canvas.zoomIn),
-                        GwIconButton(icon: Icons.fit_screen_outlined, tooltip: 'Fit to screen', size: 32, onPressed: _canvas.fit),
-                        Container(width: 1, height: 20, color: Gw.line, margin: const EdgeInsets.symmetric(horizontal: 4)),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Gw.line,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+                        GwIconButton(
+                          icon: Icons.remove,
+                          tooltip: 'Zoom out',
+                          size: 32,
+                          onPressed: _canvas.zoomOut,
+                        ),
+                        GwIconButton(
+                          icon: Icons.add,
+                          tooltip: 'Zoom in',
+                          size: 32,
+                          onPressed: _canvas.zoomIn,
+                        ),
+                        GwIconButton(
+                          icon: Icons.fit_screen_outlined,
+                          tooltip: 'Fit to screen',
+                          size: 32,
+                          onPressed: _canvas.fit,
+                        ),
+                        Container(
+                          width: 1,
+                          height: 20,
+                          color: Gw.line,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
                         GwButton(
                           label: wide ? 'Save' : '',
                           icon: Icons.save_outlined,
                           size: GwSize.sm,
                           loading: _saving,
-                          onPressed: _dirty ? () => _save(announce: true) : null,
+                          onPressed: _dirty
+                              ? () => _save(announce: true)
+                              : null,
                         ),
                         const SizedBox(width: 6),
                         GwButton(
@@ -731,8 +988,19 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                         ),
                         const SizedBox(width: 6),
                         _saved.status == 'active'
-                            ? GwButton(label: wide ? 'Pause' : '', icon: Icons.pause, size: GwSize.sm, loading: _statusBusy, onPressed: _pause)
-                            : GwButton(label: 'Activate', variant: GwVariant.primary, size: GwSize.sm, onPressed: _activate),
+                            ? GwButton(
+                                label: wide ? 'Pause' : '',
+                                icon: Icons.pause,
+                                size: GwSize.sm,
+                                loading: _statusBusy,
+                                onPressed: _pause,
+                              )
+                            : GwButton(
+                                label: 'Activate',
+                                variant: GwVariant.primary,
+                                size: GwSize.sm,
+                                onPressed: _activate,
+                              ),
                       ],
                     ),
                   ],
@@ -746,7 +1014,9 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                         width: 256,
                         decoration: const BoxDecoration(
                           color: Gw.sidebar,
-                          border: Border(right: BorderSide(color: Gw.lineSubtle)),
+                          border: Border(
+                            right: BorderSide(color: Gw.lineSubtle),
+                          ),
                         ),
                         child: _library(),
                       ),
@@ -757,28 +1027,41 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                             child: DragTarget<NodeType>(
                               onAcceptWithDetails: (details) {
                                 final world = _canvas.worldAt(details.offset);
-                                if (world != null) _addNode(details.data, at: Offset(((world.dx - 118) / 10).round() * 10.0, ((world.dy - 30) / 10).round() * 10.0));
+                                if (world != null) {
+                                  _addNode(
+                                    details.data,
+                                    at: Offset(
+                                      ((world.dx - 118) / 10).round() * 10.0,
+                                      ((world.dy - 30) / 10).round() * 10.0,
+                                    ),
+                                  );
+                                }
                               },
                               builder: (_, _, _) => FlowCanvas(
-                              definition: _def,
-                              steps: steps,
-                              issueCounts: issueCounts,
-                              selectedId: _selected,
-                              editable: true,
-                              controller: _canvas,
-                              onSelect: (id) {
-                                setState(() => _selected = id);
-                                if (id != null && !wide) _openConfigSheet();
-                              },
-                              onMove: (id, x, y) => _updateNode(id, (n) => n.copyWith(x: x, y: y)),
-                              onConnect: _connect,
-                            ),
+                                definition: _def,
+                                steps: steps,
+                                issueCounts: issueCounts,
+                                selectedId: _selected,
+                                editable: true,
+                                controller: _canvas,
+                                onSelect: (id) {
+                                  setState(() => _selected = id);
+                                  if (id != null && !wide) _openConfigSheet();
+                                },
+                                onMove: (id, x, y) => _updateNode(
+                                  id,
+                                  (n) => n.copyWith(x: x, y: y),
+                                ),
+                                onConnect: _connect,
+                              ),
                             ),
                           ),
                           if (_def.nodes.isEmpty)
                             Center(
                               child: Container(
-                                constraints: const BoxConstraints(maxWidth: 300),
+                                constraints: const BoxConstraints(
+                                  maxWidth: 300,
+                                ),
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
                                   color: const Color(0xE6151923),
@@ -788,12 +1071,25 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text('Start with a trigger', style: GwText.bodyMedium),
+                                    Text(
+                                      'Start with a trigger',
+                                      style: GwText.bodyMedium,
+                                    ),
                                     const SizedBox(height: 4),
-                                    Text('Choose how this workflow starts from the steps library.', textAlign: TextAlign.center, style: GwText.meta),
+                                    Text(
+                                      'Choose how this workflow starts from the steps library.',
+                                      textAlign: TextAlign.center,
+                                      style: GwText.meta,
+                                    ),
                                     if (!wide) ...[
                                       const SizedBox(height: 12),
-                                      GwButton(label: 'Add a step', icon: Icons.add, variant: GwVariant.primary, size: GwSize.sm, onPressed: _openLibrarySheet),
+                                      GwButton(
+                                        label: 'Add a step',
+                                        icon: Icons.add,
+                                        variant: GwVariant.primary,
+                                        size: GwSize.sm,
+                                        onPressed: _openLibrarySheet,
+                                      ),
                                     ],
                                   ],
                                 ),
@@ -815,9 +1111,17 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      GwButton(label: 'Add step', icon: Icons.add, variant: GwVariant.ghost, size: GwSize.sm, onPressed: _openLibrarySheet),
                                       GwButton(
-                                        label: _selectedNode != null ? 'Configure' : 'Details',
+                                        label: 'Add step',
+                                        icon: Icons.add,
+                                        variant: GwVariant.ghost,
+                                        size: GwSize.sm,
+                                        onPressed: _openLibrarySheet,
+                                      ),
+                                      GwButton(
+                                        label: _selectedNode != null
+                                            ? 'Configure'
+                                            : 'Details',
                                         icon: Icons.tune,
                                         variant: GwVariant.ghost,
                                         size: GwSize.sm,
@@ -837,7 +1141,9 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
                         width: 352,
                         decoration: const BoxDecoration(
                           color: Gw.sidebar,
-                          border: Border(left: BorderSide(color: Gw.lineSubtle)),
+                          border: Border(
+                            left: BorderSide(color: Gw.lineSubtle),
+                          ),
                         ),
                         child: _configPanel(),
                       ),
@@ -857,13 +1163,24 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
       right: 12,
       bottom: wide ? 12 : 68,
       child: Container(
-        width: (MediaQuery.of(context).size.width - 24).clamp(0, 416).toDouble(),
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
+        width: (MediaQuery.of(context).size.width - 24)
+            .clamp(0, 416)
+            .toDouble(),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.45,
+        ),
         decoration: BoxDecoration(
           color: Gw.surface,
           borderRadius: BorderRadius.circular(Gw.rLg),
           border: Border.all(color: Gw.line),
-          boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 32, offset: Offset(0, 12), spreadRadius: -8)],
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x99000000),
+              blurRadius: 32,
+              offset: Offset(0, 12),
+              spreadRadius: -8,
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -876,18 +1193,30 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
               ),
               child: Row(
                 children: [
-                  Text('Test run', style: GwText.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Test run',
+                    style: GwText.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   StatusBadge(e?.status ?? 'queued', small: true),
                   const SizedBox(width: 8),
                   Text(formatDuration(e?.durationMs), style: GwText.micro),
                   const Spacer(),
-                  if (e != null) GwLink('Details', onTap: () => context.go('/executions/${e.id}')),
+                  if (e != null)
+                    GwLink(
+                      'Details',
+                      onTap: () => context.go('/executions/${e.id}'),
+                    ),
                   GwIconButton(
                     icon: _runCollapsed ? Icons.expand_less : Icons.expand_more,
-                    tooltip: _runCollapsed ? 'Expand test run' : 'Collapse test run',
+                    tooltip: _runCollapsed
+                        ? 'Expand test run'
+                        : 'Collapse test run',
                     size: 32,
-                    onPressed: () => setState(() => _runCollapsed = !_runCollapsed),
+                    onPressed: () =>
+                        setState(() => _runCollapsed = !_runCollapsed),
                   ),
                   GwIconButton(
                     icon: Icons.close,
@@ -910,7 +1239,10 @@ class _BuilderScreenState extends ConsumerState<BuilderScreen> {
               Flexible(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(6),
-                  child: ExecutionTimeline(key: ValueKey(e.status), steps: e.steps),
+                  child: ExecutionTimeline(
+                    key: ValueKey(e.status),
+                    steps: e.steps,
+                  ),
                 ),
               ),
             ],
@@ -933,10 +1265,12 @@ class _ConfigHost extends StatefulWidget {
 class _ConfigHostState extends State<_ConfigHost> {
   @override
   Widget build(BuildContext context) => Consumer(
-        builder: (context, ref, _) {
-          ref.watch(integrationsProvider); // rebuild when integrations load
-          return ValueListenableBuilder<int>(valueListenable: widget.state._rev, builder: (_, _, _) => widget.state._configPanel(inSheet: true));
-        },
+    builder: (context, ref, _) {
+      ref.watch(integrationsProvider); // rebuild when integrations load
+      return ValueListenableBuilder<int>(
+        valueListenable: widget.state._rev,
+        builder: (_, _, _) => widget.state._configPanel(inSheet: true),
       );
+    },
+  );
 }
-

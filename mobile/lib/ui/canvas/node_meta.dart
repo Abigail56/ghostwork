@@ -19,7 +19,9 @@ const kindStyles = {
 
 KindStyle kindStyle(String kind) => kindStyles[kind] ?? kindStyles['action']!;
 
-String kindOf(String type) => type.startsWith('trigger.') ? 'trigger' : (type.startsWith('condition.') ? 'condition' : 'action');
+String kindOf(String type) => type.startsWith('trigger.')
+    ? 'trigger'
+    : (type.startsWith('condition.') ? 'condition' : 'action');
 
 const nodeIcons = <String, IconData>{
   'trigger.manual': Icons.back_hand_outlined,
@@ -29,6 +31,9 @@ const nodeIcons = <String, IconData>{
   'action.transform': Icons.shuffle,
   'action.email': Icons.mail_outline,
   'action.slack': Icons.chat_bubble_outline,
+  'action.github_issue': Icons.adjust,
+  'action.sheets_append': Icons.table_chart_outlined,
+  'action.sheets_read': Icons.table_rows_outlined,
   'condition.if': Icons.call_split,
 };
 
@@ -37,7 +42,7 @@ const providerIcons = <String, IconData>{
   'slack': Icons.chat_bubble_outline,
   'http_auth': Icons.key_outlined,
   'google': Icons.table_chart_outlined,
-  'github': Icons.call_split,
+  'github': Icons.adjust,
 };
 
 IconData nodeIcon(String type) => nodeIcons[type] ?? Icons.circle_outlined;
@@ -72,20 +77,35 @@ String summarize(String type, Map<String, dynamic> c) {
       if (parsed == null || parsed.host.isEmpty) return '$method $url';
       return '$method ${parsed.host}${parsed.path == '/' ? '' : parsed.path}';
     case 'action.transform':
-      final fields = ((c['fields'] as List?) ?? const []).map((f) => (f as Map)['key']).toList();
+      final fields = ((c['fields'] as List?) ?? const [])
+          .map((f) => (f as Map)['key'])
+          .toList();
       return fields.isEmpty ? 'No fields yet' : 'Builds ${fields.join(', ')}';
     case 'action.email':
       final to = ((c['to'] as List?) ?? const []).cast<String>();
       return to.isEmpty ? 'Recipients not set' : 'To ${to.join(', ')}';
     case 'action.slack':
       final text = (c['text'] as String?) ?? '';
-      return text.isEmpty ? 'Message not set' : (text.length > 60 ? text.substring(0, 60) : text);
+      return text.isEmpty
+          ? 'Message not set'
+          : (text.length > 60 ? text.substring(0, 60) : text);
+    case 'action.github_issue':
+      final repo = (c['repository'] as String?) ?? '';
+      return repo.isEmpty ? 'Repository not set' : 'Issue in $repo';
+    case 'action.sheets_append':
+    case 'action.sheets_read':
+      if ('${c['spreadsheet_id'] ?? ''}'.isEmpty) return 'Spreadsheet not set';
+      final range = '${c['sheet_range'] ?? ''}'.isEmpty
+          ? 'Sheet1'
+          : c['sheet_range'];
+      return '${type.endsWith('append') ? 'Add row to' : 'Read'} $range';
     case 'condition.if':
       final left = (c['left'] as String?) ?? '';
       if (left.isEmpty) return 'Condition not set';
       final op = (c['operator'] as String?) ?? 'equals';
       final unary = op == 'is_empty' || op == 'is_not_empty';
-      return '${left.replaceAll(RegExp(r'\{\{\s*|\s*\}\}'), '')} ${_operatorLabels[op] ?? ''} ${unary ? '' : (c['right'] ?? '')}'.trim();
+      return '${left.replaceAll(RegExp(r'\{\{\s*|\s*\}\}'), '')} ${_operatorLabels[op] ?? ''} ${unary ? '' : (c['right'] ?? '')}'
+          .trim();
     default:
       return '';
   }

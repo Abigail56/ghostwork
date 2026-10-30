@@ -17,15 +17,9 @@ _DESCRIPTIONS = {
     "smtp": "Send email from workflows through any SMTP server you control.",
     "slack": "Post messages to a Slack channel with an incoming webhook.",
     "http_auth": "Store an API token once and attach it to HTTP request steps.",
+    "github": "Create issues from workflows with a personal access token.",
+    "google": "Read and append spreadsheet rows with a Google service account.",
 }
-PLANNED = [
-    ProviderRead(key="google", label="Google Workspace", available=False, verifiable=False,
-                 description="Sheets, Gmail and Drive actions. Planned."),
-    ProviderRead(key="github", label="GitHub", available=False, verifiable=False,
-                 description="Issue, pull request and repository events. Planned."),
-]
-
-
 def _read(integration: Integration) -> IntegrationRead:
     return IntegrationRead(
         id=integration.id,
@@ -53,7 +47,7 @@ def providers():
                      verifiable=p.verify is not None)
         for p in service.PROVIDERS.values()
     ]
-    return available + PLANNED
+    return available
 
 
 @router.get("", response_model=list[IntegrationRead])

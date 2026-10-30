@@ -37,8 +37,15 @@ what each step did afterwards.
 | Settings | Profile, email, password, sessions, notification and appearance preferences, activity log, account deletion |
 | Mobile app | Every web feature natively in Flutter: public pages, auth and recovery, dashboard, workflow management, touch builder, executions, integrations, templates, settings, help |
 
-**Not implemented (shown as "Planned" in the UI):** Google Workspace and GitHub
-integrations, team workspaces, billing, push notifications.
+| GitHub | Connect with a personal access token, create issues; GitHub webhooks can start workflows |
+| Google Sheets | Connect with a service account, append and read rows |
+| Push notifications | Browser push (Web Push/VAPID) and Android/iOS push (Firebase, needs your own project) when a run fails |
+
+**Not implemented (shown as "Planned" in the UI):** team workspaces, billing, OAuth sign-in.
+
+**How far these are verified:** browser push was delivered for real through Google's push
+service in Chrome. GitHub and Google Sheets are tested only against mocked HTTP responses, since
+no real credentials were available. Android/iOS push has never run on a device.
 
 GhostWork has **not** been hardened or load-tested for production use; see
 [Production checklist](#production-checklist).
@@ -115,7 +122,7 @@ Stop any locally running API/web servers first (ports 8000 and 3000).
 ## Testing
 
 ```bash
-# Backend: 59 tests against a real PostgreSQL test database (ghostwork_test)
+# Backend: 73 tests against a real PostgreSQL test database (ghostwork_test)
 docker exec ghostwork-db psql -U ghostwork -d ghostwork -c "CREATE DATABASE ghostwork_test OWNER ghostwork;"  # once
 cd backend && .venv/bin/pytest -q
 
@@ -124,7 +131,7 @@ cd frontend && npm run typecheck && npm run lint && npm run build
 
 # End-to-end (Playwright) — needs the API and a Celery worker running
 cd frontend && npx playwright install chromium   # once
-npm run test:e2e                                  # 15 tests (desktop + mobile viewport)
+npm run test:e2e                                  # 17 tests (desktop + mobile viewport); E2E_REAL_PUSH=1 adds a real push delivery test in Chrome
 
 # Mobile: 28 tests (models, API client auth flow, builder logic, redirects, widgets, sign-in flow)
 cd mobile && flutter test
@@ -232,9 +239,17 @@ stored in the Keychain/Keystore and rotates on every refresh. See
 The Terms text lives in `frontend/src/lib/terms.json`. After editing it, run
 `scripts/sync-shared.sh` to copy it to the mobile app; CI fails if the copies differ.
 
+## Setting up GitHub, Google and push
+
+- **GitHub:** create a [fine-grained token](https://github.com/settings/personal-access-tokens) with Issues read and write, then connect it under Integrations.
+- **Google Sheets:** in Google Cloud, enable the Sheets API and create a service account with a JSON key. Paste the key under Integrations and share each spreadsheet with the account's email.
+- **Browser push:** generate VAPID keys and set `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY` and `VAPID_SUBJECT` in `backend/.env`, then restart the API and worker. Browsers need HTTPS in production (`localhost` is exempt).
+- **Android/iOS push:** see [docs/mobile-flutter.md](docs/mobile-flutter.md#push-notifications).
+
 ## Legal
 
-The Terms of Service (`frontend/src/lib/terms.ts`, shown at `/terms` and during sign-up) and
+The Terms of Service (`frontend/src/lib/terms.json`, shown at `/terms` and during sign-up) and
 Privacy page are written in plain language for GhostWork's actual behavior. They have not
-been reviewed by a lawyer; have them reviewed before offering GhostWork to the public, and
+been reviewed by a lawyer; have them reviewed before offering GhostWork to the public (start
+with [docs/legal-review-brief.md](docs/legal-review-brief.md)), and
 bump `TERMS_VERSION` (frontend and `backend/app/core/config.py`) whenever they change.

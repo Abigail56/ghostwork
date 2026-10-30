@@ -27,7 +27,7 @@ export default function PricingPage() {
               "Up to 50 steps per workflow",
               "Up to 5 runs in progress at once",
               "Schedules, webhooks and manual runs",
-              "HTTP, transform, condition, email and Slack steps",
+              "HTTP, transform, condition, email, Slack, GitHub and Google Sheets steps",
               "Full execution history",
             ].map((item) => (
               <li key={item} className="flex gap-2.5">

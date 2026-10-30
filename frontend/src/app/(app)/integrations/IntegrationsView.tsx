@@ -1,11 +1,10 @@
 "use client";
 
-import { FileSpreadsheet, GitBranch, Plug, Plus, ShieldCheck, Trash2, Zap } from "lucide-react";
+import { Plug, Plus, ShieldCheck, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { cx } from "@/components/ui/cx";
 import { ErrorState, InlineAlert, LoadingBlock } from "@/components/ui/Feedback";
-import { Field, Input, SegmentedControl, Switch } from "@/components/ui/Form";
+import { Field, Input, SegmentedControl, Switch, Textarea } from "@/components/ui/Form";
 import { Card, PageHeader } from "@/components/ui/Layout";
 import { ConfirmDialog, Dialog } from "@/components/ui/Overlay";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -15,14 +14,14 @@ import { PROVIDER_ICONS } from "@/lib/nodes";
 import { useConnectIntegration, useIntegrationAction, useIntegrations, useProviders } from "@/lib/queries";
 import type { Integration, Provider } from "@/lib/types";
 
-const PLANNED_ICONS: Record<string, React.ElementType> = { google: FileSpreadsheet, github: GitBranch };
-
 type FormState = Record<string, string | boolean>;
 
 const DEFAULTS: Record<string, FormState> = {
   smtp: { name: "Email", host: "", port: "587", username: "", password: "", use_tls: true, sender: "" },
   slack: { name: "Slack", webhook_url: "" },
   http_auth: { name: "API credential", scheme: "bearer", header_name: "X-API-Key", token: "" },
+  github: { name: "GitHub", token: "" },
+  google: { name: "Google Sheets", service_account_json: "" },
 };
 
 function toConfig(provider: string, f: FormState) {
@@ -36,6 +35,8 @@ function toConfig(provider: string, f: FormState) {
       sender: String(f.sender).trim(),
     };
   if (provider === "slack") return { webhook_url: String(f.webhook_url).trim() };
+  if (provider === "github") return { token: String(f.token).trim() };
+  if (provider === "google") return { service_account_json: String(f.service_account_json).trim() };
   return {
     scheme: f.scheme,
     header_name: f.scheme === "bearer" ? "Authorization" : String(f.header_name).trim(),
@@ -84,7 +85,7 @@ function ConnectDialog({ provider, onClose }: { provider: Provider | null; onClo
         <>
           <Button onClick={close}>Cancel</Button>
           <Button type="submit" form="connect-form" variant="primary" loading={connect.isPending}>
-            {key === "smtp" ? "Check and connect" : "Connect"}
+            {key === "smtp" || key === "github" || key === "google" ? "Check and connect" : "Connect"}
           </Button>
         </>
       }
@@ -110,6 +111,16 @@ function ConnectDialog({ provider, onClose }: { provider: Provider | null; onClo
         {key === "slack" && (
           <Field label="Incoming webhook URL" hint="Create one in Slack under Apps → Incoming Webhooks.">
             {(p) => <Input {...p} value={String(f.webhook_url)} placeholder="https://hooks.slack.com/services/…" autoComplete="off" onChange={(e) => set({ webhook_url: e.target.value })} />}
+          </Field>
+        )}
+        {key === "github" && (
+          <Field label="Personal access token" hint="Create a fine-grained token on GitHub with Issues read and write access to your repositories.">
+            {(p) => <Input {...p} type="password" value={String(f.token)} autoComplete="new-password" onChange={(e) => set({ token: e.target.value })} />}
+          </Field>
+        )}
+        {key === "google" && (
+          <Field label="Service account key (JSON)" hint="Create a service account in Google Cloud, enable the Sheets API, then paste its key file. Share each spreadsheet with its email.">
+            {(p) => <Textarea {...p} rows={6} value={String(f.service_account_json)} spellCheck={false} className="font-mono text-meta" onChange={(e) => set({ service_account_json: e.target.value })} />}
           </Field>
         )}
         {key === "http_auth" && (
@@ -148,7 +159,7 @@ function ConnectionRow({ integration }: { integration: Integration }) {
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const details = Object.entries(integration.details).filter(([k]) => !["has_password", "use_tls"].includes(k));
-  const providerVerifiable = integration.provider === "smtp";
+  const providerVerifiable = ["smtp", "github", "google"].includes(integration.provider);
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
       <div className="min-w-0 flex-1">
@@ -230,13 +241,12 @@ export function IntegrationsView() {
     );
 
   const available = providers.data.filter((p) => p.available);
-  const planned = providers.data.filter((p) => !p.available);
   const byProvider = (key: string) => integrations.data.filter((i) => i.provider === key);
 
   return (
     <>
       <PageHeader title="Integrations" description="Connect services once, then use them in any workflow step." />
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {available.map((provider) => {
           const Icon = PROVIDER_ICONS[provider.key] ?? Plug;
           const connected = byProvider(provider.key);
@@ -278,27 +288,6 @@ export function IntegrationsView() {
           <p className="px-5 py-8 text-center text-body text-fg-muted">No connections yet. Connect a service above to use it in workflows.</p>
         )}
       </Card>
-
-      <section aria-labelledby="planned" className="mt-5">
-        <h2 id="planned" className="mb-3 text-section font-semibold">
-          Planned
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {planned.map((provider) => {
-            const Icon = PLANNED_ICONS[provider.key] ?? Plug;
-            return (
-              <div key={provider.key} className={cx("flex items-center gap-3 rounded-lg border border-dashed border-line-strong px-4 py-3")}>
-                <Icon size={18} className="text-fg-disabled" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-body font-medium text-fg-secondary">{provider.label}</p>
-                  <p className="text-meta text-fg-muted">{provider.description}</p>
-                </div>
-                <span className="ml-auto shrink-0 rounded-full bg-elevated px-2 py-0.5 text-micro text-fg-muted">Not available yet</span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
 
       <ConnectDialog provider={connecting} onClose={() => setConnecting(null)} />
     </>

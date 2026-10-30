@@ -3,7 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Bell, KeyRound, Laptop, MonitorSmartphone, Palette, ScrollText, Smartphone, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { PasswordInput, PasswordStrength, passwordProblems } from "@/components/app/PasswordInput";
@@ -13,7 +14,9 @@ import { Field, Input, SegmentedControl, Switch } from "@/components/ui/Form";
 import { Card, CardHeader, Pagination, Tabs } from "@/components/ui/Layout";
 import { ConfirmDialog, Dialog } from "@/components/ui/Overlay";
 import { useToast } from "@/components/ui/Toast";
+import { api } from "@/lib/api";
 import { useAuth, useRequiredUser } from "@/lib/auth";
+import { currentSubscription, disablePush, enablePush, pushSupported } from "@/lib/push";
 import { formatDate, formatDateTime, initials, timeAgo } from "@/lib/format";
 import { useActivity, useChangeEmail, useChangePassword, useDeleteAccount, useSessionAction, useSessions, useUpdateProfile } from "@/lib/queries";
 import type { User as UserType } from "@/lib/types";
@@ -368,6 +371,58 @@ function SessionsTab() {
   );
 }
 
+function BrowserPush() {
+  const toast = useToast();
+  const config = useQuery({ queryKey: ["push-config"], queryFn: () => api<{ web_push_public_key: string | null }>("/push/config", { auth: false }) });
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!pushSupported()) return;
+    currentSubscription().then((s) => setEnabled(Boolean(s))).catch(() => setEnabled(false));
+  }, []);
+  const key = config.data?.web_push_public_key;
+  if (!pushSupported()) return <p className="text-meta text-fg-muted">This browser doesn&apos;t support push notifications.</p>;
+  if (config.isPending) return null;
+  if (!key) return <p className="text-meta text-fg-muted">Browser push isn&apos;t configured on this server.</p>;
+  return (
+    <div className="flex flex-col gap-3">
+      <Switch
+        label="Push notifications in this browser"
+        description="Show a system notification on this device when a run fails, even when GhostWork isn't open."
+        checked={enabled}
+        disabled={busy}
+        onChange={async (next) => {
+          setBusy(true);
+          try {
+            if (next) await enablePush(key);
+            else await disablePush();
+            setEnabled(next);
+            toast({ tone: "success", title: next ? "Push turned on for this browser" : "Push turned off for this browser" });
+          } catch (e) {
+            toast({ tone: "error", title: "Couldn't change push notifications", description: (e as Error).message });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+      {enabled && (
+        <Button
+          size="sm"
+          className="w-fit"
+          onClick={() =>
+            api<{ message: string }>("/push/test", { method: "POST" }).then(
+              (r) => toast({ tone: "success", title: "Test notification sent", description: r.message }),
+              (e) => toast({ tone: "error", title: "Couldn't send a test", description: (e as Error).message }),
+            )
+          }
+        >
+          Send a test
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function NotificationsTab() {
   const user = useRequiredUser();
   const { save, pending } = useSavePreferences();
@@ -384,6 +439,16 @@ function NotificationsTab() {
           disabled={pending}
           onChange={(v) => save({ email_on_failure: v })}
         />
+        <Switch
+          label="Push me when a run fails"
+          description="Sent to every device where push is turned on."
+          checked={user.push_on_failure}
+          disabled={pending}
+          onChange={(v) => save({ push_on_failure: v })}
+        />
+        <div className="border-t border-line-subtle pt-5">
+          <BrowserPush />
+        </div>
       </div>
     </Card>
   );

@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, authRequest, refreshSession, setAccessToken, setSessionLostHandler } from "./api";
+import { disablePush, pushSupported } from "./push";
 import type { TokenResponse, User } from "./types";
 
 type Status = "loading" | "authenticated" | "anonymous";
@@ -117,6 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async (destination = "/login") => {
     setExitTo(destination);
+    // A signed-out browser must stop receiving this account's notifications.
+    if (pushSupported()) await disablePush().catch(() => undefined);
     try {
       await authRequest("/auth/logout");
     } finally {

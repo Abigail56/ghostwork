@@ -50,7 +50,21 @@ flutter run -d chrome --web-port 8090 --dart-define=API_BASE_URL=http://localhos
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000 --dart-define=WEB_APP_URL=http://10.0.2.2:3000
 ```
 
-## Not built
+## Push notifications
 
-Push notifications need FCM/APNs setup and a device-token endpoint. The app shows in-app
-notifications.
+Android/iOS push uses Firebase Cloud Messaging and stays off until you supply your own Firebase
+project. **This code has never run on a real device or emulator**, so test it before relying on it.
+
+1. Create a Firebase project and add the Android and iOS apps. For iOS, also upload an APNs key and
+   enable the Push Notifications capability in Xcode.
+2. Backend: download a service account key and set `FCM_SERVICE_ACCOUNT_FILE` in `backend/.env`.
+3. App: build with the project's values:
+
+   ```bash
+   flutter run --dart-define=FIREBASE_API_KEY=... --dart-define=FIREBASE_APP_ID=... \
+     --dart-define=FIREBASE_SENDER_ID=... --dart-define=FIREBASE_PROJECT_ID=...
+   ```
+
+4. Turn it on under Settings → Notifications.
+
+Without these values, and in the Flutter web build, Settings says push isn't set up in this build.

@@ -50,7 +50,7 @@ def clean_tables():
         conn.execute(
             text(
                 "TRUNCATE users, refresh_sessions, password_reset_tokens, workflows, workflow_executions, "
-                "execution_steps, integrations, notifications, activity_events CASCADE"
+                "execution_steps, integrations, notifications, activity_events, push_subscriptions CASCADE"
             )
         )
 

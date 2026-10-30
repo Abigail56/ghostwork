@@ -100,6 +100,27 @@ class SlackConfig(_Config):
     text: str = Field(default="", max_length=3000)
 
 
+class GitHubIssueConfig(_Config):
+    integration_id: uuid.UUID | None = None
+    repository: str = Field(default="", max_length=200)
+    title: str = Field(default="", max_length=500)
+    body: str = Field(default="", max_length=TEMPLATE_MAX)
+    labels: list[str] = Field(default_factory=list, max_length=20)
+
+
+class SheetsAppendConfig(_Config):
+    integration_id: uuid.UUID | None = None
+    spreadsheet_id: str = Field(default="", max_length=200)
+    sheet_range: str = Field(default="Sheet1", max_length=200)
+    values: list[str] = Field(default_factory=list, max_length=50)
+
+
+class SheetsReadConfig(_Config):
+    integration_id: uuid.UUID | None = None
+    spreadsheet_id: str = Field(default="", max_length=200)
+    sheet_range: str = Field(default="Sheet1", max_length=200)
+
+
 Operator = Literal[
     "equals", "not_equals", "contains", "not_contains", "greater_than", "less_than", "is_empty", "is_not_empty"
 ]
@@ -144,6 +165,13 @@ NODE_TYPES: dict[str, NodeType] = {
         NodeType(
             "action.slack", "action", "Slack message", "Post to Slack with an incoming webhook.", SlackConfig, "slack"
         ),
+        NodeType(
+            "action.github_issue", "action", "GitHub issue", "Create an issue in a GitHub repository.", GitHubIssueConfig, "github"
+        ),
+        NodeType(
+            "action.sheets_append", "action", "Append to sheet", "Add a row to a Google Sheet.", SheetsAppendConfig, "google"
+        ),
+        NodeType("action.sheets_read", "action", "Read sheet", "Read rows from a Google Sheet.", SheetsReadConfig, "google"),
         NodeType(
             "condition.if",
             "condition",
@@ -425,6 +453,29 @@ def validate_definition(raw: dict, integrations: dict[uuid.UUID, str] | None = N
             if not config.text.strip():
                 issues.append(Issue("Enter the message text.", node.id, "text"))
             _check_templates(node, "text", config.text, issues, before)
+        elif isinstance(config, GitHubIssueConfig):
+            if config.integration_id is None or integrations.get(config.integration_id) != "github":
+                issues.append(Issue("Choose a connected GitHub integration.", node.id, "integration_id"))
+            if not templating.referenced_paths(config.repository) and not re.fullmatch(r"[\w.-]+/[\w.-]+", config.repository):
+                issues.append(Issue("Enter the repository as owner/name.", node.id, "repository"))
+            if not config.title.strip():
+                issues.append(Issue("Enter the issue title.", node.id, "title"))
+            for field_name, value in (("repository", config.repository), ("title", config.title), ("body", config.body)):
+                _check_templates(node, field_name, value, issues, before)
+            for label in config.labels:
+                _check_templates(node, "labels", label, issues, before)
+        elif isinstance(config, (SheetsAppendConfig, SheetsReadConfig)):
+            if config.integration_id is None or integrations.get(config.integration_id) != "google":
+                issues.append(Issue("Choose a connected Google Sheets integration.", node.id, "integration_id"))
+            if not config.spreadsheet_id.strip():
+                issues.append(Issue("Enter the spreadsheet ID from its URL.", node.id, "spreadsheet_id"))
+            if not config.sheet_range.strip():
+                issues.append(Issue("Enter the sheet or range, such as Sheet1.", node.id, "sheet_range"))
+            if isinstance(config, SheetsAppendConfig):
+                if not config.values:
+                    issues.append(Issue("Add at least one column value.", node.id, "values"))
+                for value in config.values:
+                    _check_templates(node, "values", value, issues, before)
         elif isinstance(config, ConditionConfig):
             if not config.left.strip():
                 issues.append(Issue("Choose a value to compare.", node.id, "left"))

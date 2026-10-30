@@ -2,10 +2,12 @@
 
 import json
 import logging
+import re
 import time
 import uuid
 from collections import defaultdict
 from datetime import datetime
+from urllib.parse import quote
 
 from sqlmodel import Session, select
 
@@ -14,15 +16,19 @@ from app.core.security import SecretBoxError
 from app.models import ExecutionStatus, ExecutionStep, StepStatus, User, Workflow, WorkflowExecution
 from app.models.base import utcnow
 from app.services import integrations as integration_service
-from app.services import net_guard, templating
+from app.services import external_apis, net_guard, templating
 from app.services.activity import notify
 from app.services.mailer import MailError, platform_smtp_config, send_email
+from app.services.push import send_push
 from app.services.workflow_definition import (
     NODE_TYPES,
     UNARY_OPERATORS,
     ConditionConfig,
     DefinitionError,
     EmailConfig,
+    GitHubIssueConfig,
+    SheetsAppendConfig,
+    SheetsReadConfig,
     HttpRequestConfig,
     NodeDef,
     SlackConfig,
@@ -157,6 +163,62 @@ def _run_slack(db: Session, execution: WorkflowExecution, config: SlackConfig, c
     if response.status_code >= 400:
         raise StepFailed(f"Slack rejected the message (HTTP {response.status_code}).")
     return {"sent": True, "status_code": response.status_code}
+
+
+def _run_github_issue(db: Session, execution: WorkflowExecution, config: GitHubIssueConfig, ctx: dict) -> dict:
+    try:
+        _, secrets = integration_service.load_for_execution(db, execution.owner_id, config.integration_id, "github")
+    except (integration_service.IntegrationError, SecretBoxError) as exc:
+        raise StepFailed(str(exc))
+    repository = templating.render(config.repository, ctx).strip()
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repository):
+        raise StepFailed(f"'{repository}' isn't a repository in owner/name form.")
+    payload: dict = {"title": templating.render(config.title, ctx)[:500], "body": templating.render(config.body, ctx)}
+    labels = [label for label in (templating.render(item, ctx).strip() for item in config.labels) if label]
+    if labels:
+        payload["labels"] = labels
+    try:
+        issue = external_apis.github_request(secrets["token"], "POST", f"/repos/{repository}/issues", payload)
+    except external_apis.ExternalApiError as exc:
+        raise StepFailed(str(exc))
+    return {"number": issue.get("number"), "url": issue.get("html_url"), "repository": repository}
+
+
+def _sheets_info(db: Session, execution: WorkflowExecution, integration_id) -> dict:
+    try:
+        _, secrets = integration_service.load_for_execution(db, execution.owner_id, integration_id, "google")
+        return external_apis.parse_service_account(secrets["service_account_json"])
+    except (integration_service.IntegrationError, SecretBoxError, external_apis.ExternalApiError) as exc:
+        raise StepFailed(str(exc))
+
+
+def _run_sheets_append(db: Session, execution: WorkflowExecution, config: SheetsAppendConfig, ctx: dict) -> dict:
+    info = _sheets_info(db, execution, config.integration_id)
+    row = [templating._stringify(templating.render_value(value, ctx)) for value in config.values]
+    sheet_range = quote(templating.render(config.sheet_range, ctx), safe="")
+    try:
+        result = external_apis.sheets_request(
+            info,
+            "POST",
+            templating.render(config.spreadsheet_id, ctx).strip(),
+            f"/values/{sheet_range}:append?valueInputOption=USER_ENTERED",
+            {"values": [row]},
+        )
+    except external_apis.ExternalApiError as exc:
+        raise StepFailed(str(exc))
+    updates = result.get("updates", {}) if isinstance(result, dict) else {}
+    return {"appended": row, "range": updates.get("updatedRange")}
+
+
+def _run_sheets_read(db: Session, execution: WorkflowExecution, config: SheetsReadConfig, ctx: dict) -> dict:
+    info = _sheets_info(db, execution, config.integration_id)
+    sheet_range = quote(templating.render(config.sheet_range, ctx), safe="")
+    try:
+        result = external_apis.sheets_request(info, "GET", templating.render(config.spreadsheet_id, ctx).strip(), f"/values/{sheet_range}")
+    except external_apis.ExternalApiError as exc:
+        raise StepFailed(str(exc))
+    rows = result.get("values", []) if isinstance(result, dict) else []
+    return {"rows": rows, "row_count": len(rows), "range": result.get("range") if isinstance(result, dict) else None}
 
 
 def _to_number(value: object) -> float | None:
@@ -304,6 +366,12 @@ def _run_step(db, execution, node: NodeDef, step: ExecutionStep, context: dict, 
             output = _run_email(db, execution, config, context)
         elif isinstance(config, SlackConfig):
             output = _run_slack(db, execution, config, context)
+        elif isinstance(config, GitHubIssueConfig):
+            output = _run_github_issue(db, execution, config, context)
+        elif isinstance(config, SheetsAppendConfig):
+            output = _run_sheets_append(db, execution, config, context)
+        elif isinstance(config, SheetsReadConfig):
+            output = _run_sheets_read(db, execution, config, context)
         elif isinstance(config, ConditionConfig):
             result = evaluate_condition(config, context)
             output = {"result": result}
@@ -368,6 +436,8 @@ def _notify_owner(db: Session, execution: WorkflowExecution, workflow: Workflow 
     if execution.status == ExecutionStatus.FAILED:
         if user.notify_on_failure:
             notify(db, user.id, "execution_failed", f"{name} failed", execution.error_message or "", link)
+        if user.push_on_failure:
+            send_push(db, user.id, f"{name} failed", execution.error_message or "", link)
         smtp = platform_smtp_config()
         if user.email_on_failure and smtp is not None:
             try:

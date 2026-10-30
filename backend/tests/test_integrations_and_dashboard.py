@@ -54,7 +54,7 @@ def test_slack_requires_webhook_url(client, auth):
     bad = client.post("/api/v1/integrations", headers=auth,
                       json={"provider": "slack", "name": "Slack", "config": {"webhook_url": "https://evil.example/x"}})
     assert bad.status_code == 400
-    unknown = client.post("/api/v1/integrations", headers=auth, json={"provider": "github", "name": "x", "config": {}})
+    unknown = client.post("/api/v1/integrations", headers=auth, json={"provider": "dropbox", "name": "x", "config": {}})
     assert unknown.status_code == 400
 
 
@@ -82,10 +82,10 @@ def test_smtp_integration_and_email_action(client, auth, monkeypatch):
     assert sent == [("mail-pass-1", ["ada@example.com"], "Hello Ada", "Body")]
 
 
-def test_providers_mark_planned(client):
+def test_providers_are_all_available(client):
     providers = {p["key"]: p for p in client.get("/api/v1/integrations/providers").json()}
     assert providers["smtp"]["available"] and providers["slack"]["available"]
-    assert not providers["github"]["available"] and not providers["google"]["available"]
+    assert providers["github"]["available"] and providers["google"]["available"]
 
 
 def test_dashboard_reflects_real_data(client, auth, http_server):

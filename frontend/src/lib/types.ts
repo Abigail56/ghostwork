@@ -11,6 +11,7 @@ export interface User {
   notify_on_failure: boolean;
   notify_on_success: boolean;
   email_on_failure: boolean;
+  push_on_failure: boolean;
   reduce_motion: "system" | "reduce" | "full";
   density: "comfortable" | "compact";
   created_at: string;

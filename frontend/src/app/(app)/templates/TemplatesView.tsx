@@ -15,7 +15,7 @@ import { KIND_STYLE, NODE_ICONS, kindOf } from "@/lib/nodes";
 import { useIntegrations, useTemplates, useUseTemplate } from "@/lib/queries";
 import type { Template } from "@/lib/types";
 
-const PROVIDER_LABEL: Record<string, string> = { smtp: "Email (SMTP)", slack: "Slack" };
+const PROVIDER_LABEL: Record<string, string> = { smtp: "Email (SMTP)", slack: "Slack", github: "GitHub", google: "Google Sheets" };
 
 function StepStrip({ template }: { template: Template }) {
   return (

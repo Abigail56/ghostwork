@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     SMTP_FROM: str = "GhostWork <no-reply@ghostwork.local>"
 
+    # Push notifications. Web Push needs a VAPID key pair; mobile push needs a Firebase service account.
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@ghostwork.local"
+    FCM_SERVICE_ACCOUNT_FILE: str = ""
+
     # Workflow execution limits
     MAX_WORKFLOW_NODES: int = 50
     MAX_CONCURRENT_EXECUTIONS_PER_USER: int = 5

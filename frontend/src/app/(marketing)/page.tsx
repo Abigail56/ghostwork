@@ -26,8 +26,8 @@ const INTEGRATIONS = [
   { icon: Mail, name: "Email (SMTP)", note: "Send through your server", available: true },
   { icon: MessageSquare, name: "Slack", note: "Incoming webhooks", available: true },
   { icon: CalendarClock, name: "Schedules", note: "Minutes to days", available: true },
-  { icon: FileSpreadsheet, name: "Google Workspace", note: "Planned", available: false },
-  { icon: GitBranch, name: "GitHub", note: "Planned", available: false },
+  { icon: FileSpreadsheet, name: "Google Sheets", note: "Read and append rows", available: true },
+  { icon: GitBranch, name: "GitHub", note: "Create issues", available: true },
 ];
 
 const FEATURES = [
@@ -73,7 +73,7 @@ const SECURITY = [
 const FAQ = [
   {
     q: "What can GhostWork automate today?",
-    a: "Workflows start from a manual run, a schedule or a webhook, and can call HTTP APIs, transform data, branch on conditions, send email through your SMTP server and post to Slack.",
+    a: "Workflows start from a manual run, a schedule or a webhook, and can call HTTP APIs, transform data, branch on conditions, send email through your SMTP server, post to Slack, create GitHub issues and update Google Sheets.",
   },
   {
     q: "Does GhostWork use AI to make decisions?",
@@ -81,7 +81,7 @@ const FAQ = [
   },
   {
     q: "What happens when a step fails?",
-    a: "The run stops at that step, later steps are marked as skipped, and you get an in-app notification with the error. You can fix the workflow and re-run with the same input.",
+    a: "The run stops at that step, later steps are marked as skipped, and you get a notification with the error. You can fix the workflow and re-run with the same input.",
   },
   {
     q: "Where are my credentials stored?",

@@ -9,6 +9,7 @@ const TOC = [
   ["triggers", "Triggers"],
   ["steps", "Steps"],
   ["references", "References"],
+  ["push", "Push notifications"],
   ["conditions", "Conditions"],
   ["webhooks", "Webhooks"],
   ["credentials", "Credentials"],
@@ -77,6 +78,18 @@ export default function DocsPage() {
             <h3>Slack message</h3>
             <p>Posts text to Slack through an incoming webhook. Requires a connected Slack integration.</p>
 
+            <h3>GitHub issue</h3>
+            <p>
+              Creates an issue using a connected GitHub personal access token. The result is available as{" "}
+              <code>steps.&lt;id&gt;.number</code> and <code>steps.&lt;id&gt;.url</code>. To start a workflow from GitHub, add
+              its webhook URL to a repository; a webhook signing secret from GhostWork works as GitHub&apos;s &quot;Secret&quot;.
+            </p>
+            <h3>Google Sheets</h3>
+            <p>
+              Append a row or read rows through a Google service account. Share the spreadsheet with the service
+              account&apos;s email first. Rows read are available as <code>steps.&lt;id&gt;.rows</code>.
+            </p>
+
             <h2 id="references">References</h2>
             <p>Text fields can include references in double braces. Only plain lookups are supported — no code or expressions.</p>
             <pre>
@@ -88,6 +101,12 @@ export default function DocsPage() {
 {{ workflow.name }}`}</code>
             </pre>
             <p>A step can only reference steps that run before it. Validation points out references that can&apos;t resolve.</p>
+
+            <h2 id="push">Push notifications</h2>
+            <p>
+              Turn on push in Settings → Notifications to get a system notification when a run fails. Each browser or
+              phone is turned on separately.
+            </p>
 
             <h2 id="conditions">Conditions</h2>
             <p>

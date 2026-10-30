@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config.dart';
 import '../data/api_client.dart';
 import '../data/models.dart';
+import '../data/push_service.dart';
 import '../data/token_store.dart';
 
 /// Overridden in tests with a client backed by a mock HTTP client.
@@ -59,6 +60,12 @@ class AuthController extends Notifier<AuthState> {
       state = SignedIn((await _api.register(name.trim(), email.trim(), password, acceptTerms: acceptTerms)).user);
 
   Future<void> logout({String exitTo = '/login'}) async {
+    // A signed-out device must stop receiving this account's notifications.
+    if (await PushService.isEnabled()) {
+      try {
+        await PushService(_api).disable();
+      } catch (_) {}
+    }
     try {
       await _api.logout();
     } finally {

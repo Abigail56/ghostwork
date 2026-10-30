@@ -114,6 +114,7 @@ class UserRead(BaseModel):
     notify_on_failure: bool
     notify_on_success: bool
     email_on_failure: bool
+    push_on_failure: bool
     reduce_motion: Literal["system", "reduce", "full"]
     density: Literal["comfortable", "compact"]
     created_at: datetime
@@ -127,6 +128,7 @@ class UserUpdate(BaseModel):
     notify_on_failure: bool | None = None
     notify_on_success: bool | None = None
     email_on_failure: bool | None = None
+    push_on_failure: bool | None = None
     reduce_motion: Literal["system", "reduce", "full"] | None = None
     density: Literal["comfortable", "compact"] | None = None
 

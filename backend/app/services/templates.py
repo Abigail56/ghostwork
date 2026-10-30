@@ -193,4 +193,60 @@ TEMPLATES: list[Template] = [
     ),
 ]
 
+TEMPLATES.extend(
+    [
+        Template(
+            slug="webhook-to-github-issue",
+            name="Webhook to GitHub issue",
+            description="Open a GitHub issue whenever a webhook reports a problem.",
+            category="Developer tools",
+            requires=("github",),
+            definition={
+                "nodes": [
+                    _node("hook", "trigger.webhook", "Incoming webhook", 0, 0),
+                    _node(
+                        "issue",
+                        "action.github_issue",
+                        "Create issue",
+                        0,
+                        170,
+                        {
+                            "repository": "owner/repository",
+                            "title": "{{ trigger.payload.body.title }}",
+                            "body": "Reported by GhostWork at {{ execution.started_at }}.",
+                            "labels": ["bug"],
+                        },
+                    ),
+                ],
+                "edges": [_edge("hook", "issue")],
+            },
+        ),
+        Template(
+            slug="webhook-to-sheet",
+            name="Log webhooks to Google Sheets",
+            description="Add a spreadsheet row for every webhook received.",
+            category="Data",
+            requires=("google",),
+            definition={
+                "nodes": [
+                    _node("hook", "trigger.webhook", "Incoming webhook", 0, 0),
+                    _node(
+                        "row",
+                        "action.sheets_append",
+                        "Add row",
+                        0,
+                        170,
+                        {
+                            "spreadsheet_id": "your-spreadsheet-id",
+                            "sheet_range": "Sheet1",
+                            "values": ["{{ execution.started_at }}", "{{ trigger.payload.body.event }}"],
+                        },
+                    ),
+                ],
+                "edges": [_edge("hook", "row")],
+            },
+        ),
+    ]
+)
+
 TEMPLATES_BY_SLUG = {t.slug: t for t in TEMPLATES}

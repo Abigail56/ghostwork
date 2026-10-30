@@ -16,6 +16,8 @@ router = APIRouter(prefix="/hooks", tags=["Webhooks"])
 
 # HMAC-SHA256 of the raw request body with the workflow's signing secret: "sha256=<hex>".
 SIGNATURE_HEADER = "X-GhostWork-Signature"
+# GitHub signs webhooks in the same format, so its "Secret" setting works directly.
+GITHUB_SIGNATURE_HEADER = "X-Hub-Signature-256"
 
 # Forwarded to the workflow as trigger.payload.headers; credentials are never stored.
 _FORWARDED_HEADERS = {"content-type", "user-agent", "x-github-event", "x-request-id", "x-event-type"}
@@ -38,7 +40,7 @@ async def receive_webhook(token: str, request: Request, db: SessionDep):
     if workflow.webhook_secret_encrypted:
         secret = decrypt_secrets(workflow.webhook_secret_encrypted)["secret"]
         expected = "sha256=" + hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, request.headers.get(SIGNATURE_HEADER, "")):
+        if not hmac.compare_digest(expected, request.headers.get(SIGNATURE_HEADER) or request.headers.get(GITHUB_SIGNATURE_HEADER, "")):
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing or invalid webhook signature.")
 
     text = body_bytes.decode("utf-8", errors="replace")

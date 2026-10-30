@@ -19,6 +19,10 @@ export default function PrivacyPage() {
           <li>Workflows you create, and the record of each execution, including step outputs (truncated to 64 KB).</li>
           <li>Integration credentials, encrypted at rest. They are decrypted only by the worker when a step needs them.</li>
           <li>Notifications and an activity log of actions taken in your account.</li>
+          <li>
+            If you turn on push, a device address from your browser or phone maker&apos;s push service. Notification titles
+            and text pass through that service, which is why it&apos;s off until you turn it on.
+          </li>
         </ul>
         <h2>What we don&apos;t do</h2>
         <ul>

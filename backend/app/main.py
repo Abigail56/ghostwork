@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
-from app.api.routes import auth, catalog, dashboard, executions, hooks, integrations, notifications, users, workflows
+from app.api.routes import auth, catalog, dashboard, executions, hooks, integrations, notifications, push, users, workflows
 from app.core.config import settings
 
 logging.basicConfig(level=logging.DEBUG if settings.DEBUG else logging.INFO)
@@ -49,7 +49,7 @@ async def unhandled_error(request: Request, exc: Exception):
 
 API_PREFIX = "/api/v1"
 app.include_router(health_router, prefix=API_PREFIX)
-for module in (auth, users, workflows, executions, hooks, dashboard, integrations, catalog, notifications):
+for module in (auth, users, workflows, executions, hooks, dashboard, integrations, catalog, notifications, push):
     app.include_router(module.router, prefix=API_PREFIX)
 
 
