@@ -156,44 +156,29 @@ class ApiClient {
     }
   }
 
-  /* ---------------- Resources ---------------- */
+  /* ---------------- Account ---------------- */
 
   Future<User> me() async => User.fromJson(await getJson('/auth/me'));
 
-  Future<DashboardSummary> dashboard() async => DashboardSummary.fromJson(await getJson('/dashboard/summary'));
-
-  Future<PageOf<WorkflowSummary>> workflows({String? q, String? status, int page = 1}) async => PageOf.fromJson(
-        await getJson('/workflows', query: {'q': q, 'status': status, 'page': page, 'page_size': 20, 'sort': '-updated'}),
-        WorkflowSummary.fromJson,
-      );
-
-  Future<WorkflowDetail> workflow(String id) async => WorkflowDetail.fromJson(await getJson('/workflows/$id'));
-
-  Future<WorkflowDetail> setWorkflowStatus(String id, String status) async =>
-      WorkflowDetail.fromJson((await request('POST', '/workflows/$id/status', body: {'status': status})) as Map<String, dynamic>);
-
-  Future<ExecutionSummary> runWorkflow(String id) async =>
-      ExecutionSummary.fromJson((await request('POST', '/workflows/$id/run', body: {'payload': {}})) as Map<String, dynamic>);
-
-  Future<PageOf<ExecutionSummary>> executions({String? status, String? workflowId, int page = 1}) async => PageOf.fromJson(
-        await getJson('/executions', query: {'status': status, 'workflow_id': workflowId, 'page': page, 'page_size': 20}),
-        ExecutionSummary.fromJson,
-      );
-
-  Future<ExecutionDetail> execution(String id) async => ExecutionDetail.fromJson(await getJson('/executions/$id'));
-
-  Future<ExecutionSummary> executionAction(String id, String action) async =>
-      ExecutionSummary.fromJson((await request('POST', '/executions/$id/$action')) as Map<String, dynamic>);
-
-  Future<(List<AppNotification>, int)> notifications() async {
-    final json = await getJson('/notifications');
-    return (
-      (json['items'] as List).map((e) => AppNotification.fromJson(e as Map<String, dynamic>)).toList(),
-      json['unread'] as int,
-    );
+  Future<({String message, bool emailConfigured})> forgotPassword(String email) async {
+    final j = (await request('POST', '/auth/forgot-password', auth: false, body: {'email': email})) as Map<String, dynamic>;
+    return (message: j['message'] as String, emailConfigured: j['email_delivery_configured'] as bool);
   }
 
-  Future<void> markNotification(String id) => request('POST', id == 'all' ? '/notifications/read-all' : '/notifications/$id/read');
+  Future<void> resetPassword(String token, String password) =>
+      request('POST', '/auth/reset-password', auth: false, body: {'token': token, 'password': password});
+
+  Future<String> changePassword(String current, String next) async =>
+      ((await request('POST', '/auth/change-password', body: {'current_password': current, 'new_password': next})) as Map)['message'] as String;
+
+  Future<User> changeEmail(String email, String password) async =>
+      User.fromJson((await request('POST', '/users/me/email', body: {'new_email': email, 'password': password})) as Map<String, dynamic>);
+
+  Future<void> deleteAccount(String password) async {
+    await request('DELETE', '/users/me', body: {'password': password});
+    _accessToken = null;
+    await tokens.clear();
+  }
 
   Future<User> updateProfile(Map<String, Object?> changes) async =>
       User.fromJson((await request('PATCH', '/users/me', body: changes)) as Map<String, dynamic>);
@@ -202,4 +187,112 @@ class ApiClient {
       (await getList('/auth/sessions')).map((e) => SessionInfo.fromJson(e as Map<String, dynamic>)).toList();
 
   Future<void> revokeSession(String id) => request('DELETE', '/auth/sessions/$id');
+
+  Future<String> revokeOtherSessions() async => ((await request('POST', '/auth/sessions/revoke-others')) as Map)['message'] as String;
+
+  Future<PageOf<Activity>> activity({int page = 1}) async =>
+      PageOf.fromJson(await getJson('/activity', query: {'page': page, 'page_size': 10}), Activity.fromJson);
+
+  Future<(List<AppNotification>, int)> notifications() async {
+    final json = await getJson('/notifications');
+    return ((json['items'] as List).map((e) => AppNotification.fromJson(e as Map<String, dynamic>)).toList(), json['unread'] as int);
+  }
+
+  Future<void> markNotification(String id) => request('POST', id == 'all' ? '/notifications/read-all' : '/notifications/$id/read');
+
+  Future<bool> health() async {
+    try {
+      await request('GET', '/health', auth: false);
+      return true;
+    } on ApiException {
+      return false;
+    }
+  }
+
+  /* ---------------- Dashboard & workflows ---------------- */
+
+  Future<DashboardSummary> dashboard() async => DashboardSummary.fromJson(await getJson('/dashboard/summary'));
+
+  Future<PageOf<WorkflowSummary>> workflows({String? q, String? status, String sort = '-updated', int page = 1, int pageSize = 12}) async =>
+      PageOf.fromJson(
+        await getJson('/workflows', query: {'q': q, 'status': status, 'sort': sort, 'page': page, 'page_size': pageSize}),
+        WorkflowSummary.fromJson,
+      );
+
+  Future<Workflow> workflow(String id) async => Workflow.fromJson(await getJson('/workflows/$id'));
+
+  Future<Workflow> _workflowCall(String method, String path, [Object? body]) async =>
+      Workflow.fromJson((await request(method, path, body: body)) as Map<String, dynamic>);
+
+  Future<Workflow> createWorkflow({required String name, String description = '', Definition? definition}) =>
+      _workflowCall('POST', '/workflows', {'name': name, 'description': description, 'definition': definition?.toJson()});
+
+  Future<Workflow> updateWorkflow(String id, {String? name, String? description, Definition? definition, int? expectedVersion}) =>
+      _workflowCall('PATCH', '/workflows/$id', {
+        'name': ?name,
+        'description': ?description,
+        if (definition != null) 'definition': definition.toJson(),
+        'expected_version': ?expectedVersion,
+      });
+
+  Future<void> deleteWorkflow(String id) => request('DELETE', '/workflows/$id');
+
+  Future<Workflow> duplicateWorkflow(String id) => _workflowCall('POST', '/workflows/$id/duplicate');
+
+  Future<Workflow> setWorkflowStatus(String id, String status) => _workflowCall('POST', '/workflows/$id/status', {'status': status});
+
+  Future<Workflow> rotateWebhook(String id) => _workflowCall('POST', '/workflows/$id/webhook/rotate');
+
+  Future<String> enableWebhookSigning(String id) async =>
+      ((await request('POST', '/workflows/$id/webhook/secret')) as Map)['secret'] as String;
+
+  Future<Workflow> disableWebhookSigning(String id) => _workflowCall('DELETE', '/workflows/$id/webhook/secret');
+
+  Future<ExecutionSummary> runWorkflow(String id, [Map<String, dynamic> payload = const {}]) async =>
+      ExecutionSummary.fromJson((await request('POST', '/workflows/$id/run', body: {'payload': payload})) as Map<String, dynamic>);
+
+  /* ---------------- Executions ---------------- */
+
+  Future<PageOf<ExecutionSummary>> executions({String? q, String? status, String? workflowId, DateTime? from, DateTime? to, int page = 1, int pageSize = 20}) async =>
+      PageOf.fromJson(
+        await getJson('/executions', query: {
+          'q': q,
+          'status': status,
+          'workflow_id': workflowId,
+          'from': from?.toUtc().toIso8601String(),
+          'to': to?.toUtc().toIso8601String(),
+          'page': page,
+          'page_size': pageSize,
+        }),
+        ExecutionSummary.fromJson,
+      );
+
+  Future<Execution> execution(String id) async => Execution.fromJson(await getJson('/executions/$id'));
+
+  Future<ExecutionSummary> executionAction(String id, String action) async =>
+      ExecutionSummary.fromJson((await request('POST', '/executions/$id/$action')) as Map<String, dynamic>);
+
+  /* ---------------- Catalog, templates, integrations ---------------- */
+
+  Future<List<NodeType>> nodeTypes() async =>
+      ((await request('GET', '/node-types', auth: false)) as List).map((e) => NodeType.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<List<Template>> templates() async =>
+      ((await request('GET', '/templates', auth: false)) as List).map((e) => Template.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<Workflow> useTemplate(String slug) => _workflowCall('POST', '/templates/$slug/use', <String, dynamic>{});
+
+  Future<List<IntegrationProvider>> providers() async =>
+      ((await request('GET', '/integrations/providers', auth: false)) as List).map((e) => IntegrationProvider.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<List<Integration>> integrations() async =>
+      (await getList('/integrations')).map((e) => Integration.fromJson(e as Map<String, dynamic>)).toList();
+
+  Future<Integration> connectIntegration(String provider, String name, Map<String, dynamic> config) async => Integration.fromJson(
+      (await request('POST', '/integrations', body: {'provider': provider, 'name': name, 'config': config})) as Map<String, dynamic>);
+
+  Future<Integration> testIntegration(String id) async =>
+      Integration.fromJson((await request('POST', '/integrations/$id/test')) as Map<String, dynamic>);
+
+  Future<void> disconnectIntegration(String id) => request('DELETE', '/integrations/$id');
 }

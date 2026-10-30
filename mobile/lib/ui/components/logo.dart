@@ -60,8 +60,8 @@ class Wordmark extends StatelessWidget {
           const SizedBox(width: 10),
           Text.rich(
             TextSpan(children: [
-              TextSpan(text: 'Ghost', style: TextStyle(fontSize: size * 0.62, fontWeight: FontWeight.w600, color: Gw.fg)),
-              TextSpan(text: 'Work', style: TextStyle(fontSize: size * 0.62, fontWeight: FontWeight.w600, color: Gw.fgSecondary)),
+              TextSpan(text: 'Ghost', style: TextStyle(fontSize: size * 0.62, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: Gw.fg)),
+              TextSpan(text: 'Work', style: TextStyle(fontSize: size * 0.62, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: Gw.fgSecondary)),
             ]),
           ),
         ],

@@ -90,12 +90,14 @@ function serialize(definition: WorkflowDefinition) {
   return JSON.stringify(canonical(definition));
 }
 
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+/** The builder renders only on the client (after the session is restored), so read the media query on first render. */
 function useIsDesktop() {
-  const [desktop, setDesktop] = useState(true);
+  const [desktop, setDesktop] = useState(() => typeof window === "undefined" || window.matchMedia(DESKTOP_QUERY).matches);
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
+    const query = window.matchMedia(DESKTOP_QUERY);
     const update = () => setDesktop(query.matches);
-    update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
@@ -136,20 +138,30 @@ function BuilderInner({ workflow }: { workflow: Workflow }) {
   /* ---------- Undo / redo: snapshot the definition after edits settle ---------- */
   const [history, setHistory] = useState({ stack: [savedJson], cursor: 0 });
   const restoring = useRef(false);
+  // Typing is grouped into one undo step; adding or removing steps and connections is always its own step.
+  const structureKey = `${nodes.map((n) => n.id).join()}|${edges.map((e) => e.id).join()}`;
+  const previous = useRef({ json: currentJson, structure: structureKey });
   useEffect(() => {
+    const before = previous.current;
+    previous.current = { json: currentJson, structure: structureKey };
     if (restoring.current) {
       restoring.current = false;
       return;
     }
-    const timer = setTimeout(() => {
+    const push = (entries: string[]) =>
       setHistory((h) => {
-        if (h.stack[h.cursor] === currentJson) return h;
-        const stack = [...h.stack.slice(0, h.cursor + 1), currentJson].slice(-100);
+        const fresh = entries.filter((json, i) => json !== (i === 0 ? h.stack[h.cursor] : entries[i - 1]));
+        if (!fresh.length) return h;
+        const stack = [...h.stack.slice(0, h.cursor + 1), ...fresh].slice(-100);
         return { stack, cursor: stack.length - 1 };
       });
-    }, 400);
+    if (before.structure !== structureKey) {
+      push([before.json, currentJson]);
+      return;
+    }
+    const timer = setTimeout(() => push([currentJson]), 400);
     return () => clearTimeout(timer);
-  }, [currentJson]);
+  }, [currentJson, structureKey]);
 
   const restore = useCallback((json: string) => {
     restoring.current = true;
@@ -158,14 +170,24 @@ function BuilderInner({ workflow }: { workflow: Workflow }) {
     setEdges(toFlowEdges(def));
     setSelectedId(null);
   }, []);
-  const canUndo = history.cursor > 0;
+  // An edit may not be in the history yet (debounced above), so it counts as undoable too.
+  const hasPendingEdit = history.stack[history.cursor] !== currentJson;
+  const canUndo = history.cursor > 0 || hasPendingEdit;
   const canRedo = history.cursor < history.stack.length - 1;
   const undo = useCallback(() => {
+    if (hasPendingEdit) {
+      // Record the pending edit first, so undo steps back exactly one change.
+      const stack = [...history.stack.slice(0, history.cursor + 1), currentJson].slice(-100);
+      const cursor = stack.length - 2;
+      restore(stack[cursor]);
+      setHistory({ stack, cursor });
+      return;
+    }
     if (history.cursor <= 0) return;
     const cursor = history.cursor - 1;
     restore(history.stack[cursor]);
     setHistory({ ...history, cursor });
-  }, [history, restore]);
+  }, [history, restore, hasPendingEdit, currentJson]);
   const redo = useCallback(() => {
     if (history.cursor >= history.stack.length - 1) return;
     const cursor = history.cursor + 1;
@@ -476,6 +498,7 @@ function BuilderInner({ workflow }: { workflow: Workflow }) {
         <ul className="mt-1.5 flex flex-col gap-1">
           <li><kbd className="font-sans text-fg-secondary">Ctrl S</kbd> save · <kbd className="font-sans text-fg-secondary">Ctrl Z</kbd> undo · <kbd className="font-sans text-fg-secondary">Ctrl Shift Z</kbd> redo</li>
           <li><kbd className="font-sans text-fg-secondary">Delete</kbd> remove the selected step or connection</li>
+          <li>Drag a step to move it; drag from a bottom handle onto another step to connect them.</li>
         </ul>
       </div>
     </div>
@@ -490,6 +513,14 @@ function BuilderInner({ workflow }: { workflow: Workflow }) {
       integrations={integrations.data ?? []}
       references={references}
       webhookUrl={saved.webhook_url}
+      connections={edges
+        .filter((e) => e.source === selected.id || e.target === selected.id)
+        .map((e) => {
+          const name = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id;
+          const handle = e.sourceHandle && e.sourceHandle !== "out" ? ` (${e.sourceHandle})` : "";
+          return { id: e.id, label: e.source === selected.id ? `→ ${name(e.target)}${handle}` : `← ${name(e.source)}` };
+        })}
+      onRemoveConnection={(id) => setEdges((current) => current.filter((e) => e.id !== id))}
       onChange={(config) => updateSelected({ config })}
       onRename={(name) => updateSelected({ name })}
       onDelete={deleteSelected}
@@ -529,7 +560,7 @@ function BuilderInner({ workflow }: { workflow: Workflow }) {
         <div className="hidden md:block">{validationPill}</div>
 
         <div className="ml-auto flex items-center gap-1">
-          <div className="hidden items-center gap-0.5 sm:flex">
+          <div className="flex items-center gap-0.5">
             <Tooltip label="Undo" side="bottom">
               <Button variant="ghost" size="icon-sm" aria-label="Undo" onClick={undo} disabled={!canUndo}>
                 <Undo2 size={15} />

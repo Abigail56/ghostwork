@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Plus, Trash2, X } from "lucide-react";
+import { Check, Copy, Plus, Trash2, Unlink, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -139,9 +139,11 @@ export function ConfigPanel({
   integrations,
   references,
   webhookUrl,
+  connections,
   onChange,
   onRename,
   onDelete,
+  onRemoveConnection,
 }: {
   nodeId: string;
   data: GwNodeData;
@@ -149,6 +151,9 @@ export function ConfigPanel({
   integrations: Integration[];
   references: string[];
   webhookUrl: string | null;
+  /** Connections to and from this step, so they can be removed without a keyboard. */
+  connections: { id: string; label: string }[];
+  onRemoveConnection: (edgeId: string) => void;
   onChange: (config: Config) => void;
   onRename: (name: string) => void;
   onDelete: () => void;
@@ -367,6 +372,22 @@ export function ConfigPanel({
             )}
             <p className="text-meta text-fg-muted">Connect the <span className="text-success">True</span> and False outputs to continue each branch.</p>
           </>
+        )}
+
+        {connections.length > 0 && (
+          <div className="border-t border-line-subtle pt-4">
+            <p className="mb-1.5 text-meta font-medium text-fg-secondary">Connections</p>
+            <ul className="flex flex-col">
+              {connections.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-meta text-fg-muted">{c.label}</span>
+                  <Button variant="ghost" size="icon-sm" aria-label="Remove connection" onClick={() => onRemoveConnection(c.id)}>
+                    <Unlink size={14} />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {kind !== "trigger" && (

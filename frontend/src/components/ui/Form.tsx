@@ -67,9 +67,10 @@ export function Field({
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-meta text-fg-muted">
+        // A div, not a p: hints may contain interactive content such as a dialog trigger.
+        <div id={`${id}-hint`} className="text-meta text-fg-muted">
           {hint}
-        </p>
+        </div>
       ) : null}
     </div>
   );

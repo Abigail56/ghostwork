@@ -17,6 +17,15 @@ test("create a workflow, build it, run it, and delete it", async ({ page }) => {
   await page.getByRole("button", { name: "Add field" }).click();
   await page.getByLabel("Field name 1", { exact: true }).fill("greeting");
   await page.getByLabel("Field value 1", { exact: true }).fill("Hello {{ trigger.payload.name }}");
+  // The new step is connected to the trigger; the connection can be removed without a keyboard.
+  await expect(page.getByText("← Manual trigger")).toBeVisible();
+  await page.getByRole("button", { name: "Remove connection" }).click();
+  await expect(page.getByText("← Manual trigger")).toHaveCount(0);
+  // Undo restores the connection on the canvas (and, as designed, clears the selection).
+  const edge = page.getByRole("group", { name: "Edge from trigger to transform_1" });
+  await expect(edge).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(edge).toHaveCount(1);
   await page.keyboard.press("Control+s");
   await expect(page.getByText("Saved · valid")).toBeVisible();
 

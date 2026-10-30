@@ -44,8 +44,8 @@ export default function DocsPage() {
             <ul>
               <li>Create an account and open <strong className="text-fg">Workflows → New workflow</strong>.</li>
               <li>Pick a trigger (manual, schedule or webhook), or start from a template.</li>
-              <li>In the builder, add steps from the left panel and connect them by dragging from a step&apos;s bottom handle to the next step&apos;s top handle.</li>
-              <li>Select a step to configure it in the right panel. The toolbar shows whether the workflow is valid.</li>
+              <li>In the builder, add steps from the steps library and connect them by dragging from a step&apos;s bottom handle to the next step.</li>
+              <li>Select a step to configure it. The toolbar shows whether the workflow is valid.</li>
               <li>Press <strong className="text-fg">Test run</strong> to execute it now and watch each step complete, then <strong className="text-fg">Activate</strong> to turn on its schedule or webhook.</li>
             </ul>
 
@@ -107,7 +107,8 @@ export default function DocsPage() {
             <p>
               The request body, query string and a safe subset of headers (content type, user agent and a few event
               headers) are passed to the run. Authorization and cookie headers are never stored. Payloads are limited to
-              256 KB. Regenerate the URL at any time if it leaks.
+              256 KB. Regenerate the URL at any time if it leaks, and optionally require an HMAC-SHA256 signature in the{" "}
+              <code>X-GhostWork-Signature</code> header.
             </p>
 
             <h2 id="credentials">Credentials</h2>

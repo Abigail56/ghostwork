@@ -57,3 +57,25 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+
+  shared-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Web and mobile Terms are identical
+        run: scripts/sync-shared.sh --check
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

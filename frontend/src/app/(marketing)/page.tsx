@@ -89,7 +89,7 @@ const FAQ = [
   },
   {
     q: "Is there a mobile app?",
-    a: "Not yet. The web app works on phones for monitoring runs and quick actions, and a native app for Android and iOS is planned.",
+    a: "Yes — GhostWork runs on Android and iOS with the same features as the web app, including the workflow builder.",
   },
 ];
 

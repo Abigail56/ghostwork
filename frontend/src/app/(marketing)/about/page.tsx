@@ -30,8 +30,8 @@ export default function AboutPage() {
         </ul>
         <h2>Technology</h2>
         <p>
-          GhostWork is a Next.js web app backed by a FastAPI service, PostgreSQL for storage, and Redis with Celery for
-          background execution. The same API is designed to serve a future mobile app.
+          GhostWork is a Next.js web app and a Flutter mobile app backed by a FastAPI service, PostgreSQL for storage, and
+          Redis with Celery for background execution. Both apps use the same API.
         </p>
       </Prose>
     </>

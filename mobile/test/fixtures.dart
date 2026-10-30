@@ -52,10 +52,65 @@ final dashboardJson = {
   'total_executions': 37,
   'executions_30d': 37,
   'success_rate_30d': 91.9,
-  'trend': [],
+  'trend': [
+    {'date': '2026-10-30', 'succeeded': 2, 'failed': 1, 'other': 0},
+  ],
   'recent_executions': [executionJson],
-  'recent_activity': [],
+  'recent_activity': [
+    {'id': 'a1', 'kind': 'workflow.activated', 'message': 'Nightly sync activated', 'workflow_id': 'w1', 'created_at': '2026-10-30T08:00:00Z'},
+  ],
   'health': {'failures_24h': 1, 'successes_24h': 9, 'in_progress': 0, 'last_execution_at': null, 'attention': [{'workflow_id': 'w1', 'workflow_name': 'Nightly sync', 'reason': 'Last run failed'}]},
 };
 
 String encode(Object value) => jsonEncode(value);
+
+const notificationJson = {
+  'id': 'n1',
+  'kind': 'execution_failed',
+  'title': 'Nightly sync failed',
+  'body': '',
+  'link': '/executions/11111111-2222-3333-4444-555555555555',
+  'read_at': null,
+  'created_at': '2026-10-30T08:00:00Z',
+};
+
+final workflowSummaryJson = {
+  'id': 'w1',
+  'name': 'Nightly sync',
+  'description': 'Pulls orders every night',
+  'status': 'active',
+  'trigger_type': 'trigger.schedule',
+  'step_count': 3,
+  'last_run_at': '2026-10-30T08:00:00Z',
+  'next_run_at': null,
+  'created_at': '2026-10-01T08:00:00Z',
+  'updated_at': '2026-10-30T08:00:00Z',
+  'last_execution': {'id': '11111111-2222-3333-4444-555555555555', 'status': 'failed', 'created_at': '2026-10-30T08:00:00Z', 'finished_at': null},
+};
+
+final workflowJson = {
+  ...workflowSummaryJson,
+  'version': 4,
+  'webhook_url': null,
+  'webhook_signing_enabled': false,
+  // JSONB returns keys in a different order than the app writes them.
+  'definition': {
+    'edges': [
+      {'source': 'check', 'target': 'fetch', 'source_handle': 'true', 'id': 'e1'},
+    ],
+    'nodes': [
+      {'config': {'unit': 'hours', 'every': 1}, 'id': 'start', 'name': 'Every hour', 'type': 'trigger.schedule', 'position': {'y': 0, 'x': 0}},
+      {'config': {'left': '{{ trigger.payload.x }}', 'operator': 'equals', 'right': '1'}, 'id': 'check', 'name': 'Check', 'type': 'condition.if', 'position': {'y': 170, 'x': 0}},
+      {'config': {'method': 'GET', 'url': 'https://api.example.com/orders'}, 'id': 'fetch', 'name': 'Fetch orders', 'type': 'action.http_request', 'position': {'y': 340, 'x': -120}},
+    ],
+  },
+  'validation': [
+    {'message': 'Connect the true or false branch of this condition.', 'node_id': 'check', 'field': null},
+  ],
+};
+
+const nodeTypesJson = [
+  {'type': 'trigger.manual', 'kind': 'trigger', 'label': 'Manual trigger', 'description': 'Run on demand from GhostWork.', 'integration_provider': null, 'outputs': ['out'], 'default_config': {}},
+  {'type': 'action.transform', 'kind': 'action', 'label': 'Transform data', 'description': 'Build a new object from earlier data.', 'integration_provider': null, 'outputs': ['out'], 'default_config': {'fields': []}},
+  {'type': 'condition.if', 'kind': 'condition', 'label': 'Condition', 'description': 'Continue down the true or false branch.', 'integration_provider': null, 'outputs': ['true', 'false'], 'default_config': {'left': '', 'operator': 'equals', 'right': ''}},
+];

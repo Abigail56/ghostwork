@@ -26,10 +26,10 @@ export default function PrivacyPage() {
           <li>We don&apos;t use third-party analytics or tracking scripts.</li>
           <li>We don&apos;t return stored secrets to the browser or write them to execution logs.</li>
         </ul>
-        <h2>Cookies</h2>
+        <h2>Cookies and device storage</h2>
         <p>
-          GhostWork uses one essential cookie: an HttpOnly refresh-session cookie that keeps you signed in. It is not
-          readable by page scripts and is only sent to the authentication endpoints.
+          On the web, GhostWork uses one essential cookie: an HttpOnly refresh-session cookie that keeps you signed in.
+          In the mobile app, the refresh token is kept in the device keychain or keystore.
         </p>
         <h2>Retention and deletion</h2>
         <ul>

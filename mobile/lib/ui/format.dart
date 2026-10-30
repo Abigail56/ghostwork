@@ -1,21 +1,29 @@
 import 'package:intl/intl.dart';
 
+/// Same wording as frontend/src/lib/format.ts.
 String timeAgo(DateTime? time, {DateTime? now}) {
   if (time == null) return 'Never';
-  final diff = (now ?? DateTime.now()).difference(time);
-  if (diff.isNegative) {
-    final ahead = diff.abs();
-    if (ahead.inMinutes < 1) return 'in a moment';
-    if (ahead.inHours < 1) return 'in ${ahead.inMinutes}m';
-    if (ahead.inDays < 1) return 'in ${ahead.inHours}h';
-    return 'in ${ahead.inDays}d';
+  final seconds = time.difference(now ?? DateTime.now()).inSeconds;
+  final abs = seconds.abs();
+  if (abs < 45) return seconds <= 0 ? 'just now' : 'in a few seconds';
+  const units = [('minute', 60), ('hour', 3600), ('day', 86400), ('week', 604800), ('month', 2592000), ('year', 31536000)];
+  var unit = 'minute';
+  var size = 60;
+  for (final (u, s) in units) {
+    if (abs >= s) {
+      unit = u;
+      size = s;
+    }
   }
-  if (diff.inSeconds < 45) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
-  return DateFormat.MMMd().format(time);
+  final n = (abs / size).round();
+  if (unit == 'day' && n == 1) return seconds < 0 ? 'yesterday' : 'tomorrow';
+  final label = n == 1 ? unit : '${unit}s';
+  return seconds < 0 ? '$n $label ago' : 'in $n $label';
 }
+
+String formatDateTime(DateTime? t) => t == null ? '—' : DateFormat('MMM d, h:mm:ss a').format(t);
+
+String formatDate(DateTime? t) => t == null ? '—' : DateFormat('MMM d, y').format(t);
 
 String formatDuration(int? ms) {
   if (ms == null) return '—';
@@ -32,3 +40,8 @@ String triggerLabel(String? type) => switch (type) {
     };
 
 String shortId(String id) => id.substring(0, 8);
+
+String greeting([DateTime? now]) {
+  final h = (now ?? DateTime.now()).hour;
+  return h < 12 ? 'Good morning' : (h < 18 ? 'Good afternoon' : 'Good evening');
+}

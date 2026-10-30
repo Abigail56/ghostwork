@@ -35,7 +35,7 @@ what each step did afterwards.
 | Integrations | SMTP, Slack, HTTP credentials — secrets encrypted with Fernet, never returned |
 | Templates | 5 templates, all valid against the implemented step types |
 | Settings | Profile, email, password, sessions, notification and appearance preferences, activity log, account deletion |
-| Mobile app | Sign in/up, dashboard, workflows (run/activate/pause), live run detail, cancel/re-run, alerts, settings, sessions |
+| Mobile app | Every web feature natively in Flutter: public pages, auth and recovery, dashboard, workflow management, touch builder, executions, integrations, templates, settings, help |
 
 **Not implemented (shown as "Planned" in the UI):** Google Workspace and GitHub
 integrations, team workspaces, billing, push notifications.
@@ -126,7 +126,7 @@ cd frontend && npm run typecheck && npm run lint && npm run build
 cd frontend && npx playwright install chromium   # once
 npm run test:e2e                                  # 15 tests (desktop + mobile viewport)
 
-# Mobile: 18 tests (models, API client auth flow, widgets, sign-in flow)
+# Mobile: 28 tests (models, API client auth flow, builder logic, redirects, widgets, sign-in flow)
 cd mobile && flutter test
 ```
 
@@ -223,9 +223,14 @@ Before exposing GhostWork publicly:
 
 ## Mobile (Flutter)
 
-`mobile/` is a Flutter app for monitoring and quick actions; building workflows stays on
-the web. It uses the API's mobile auth mode (refresh token in the request body, stored in
-the Keychain/Keystore, rotated on every refresh). See [`docs/mobile-flutter.md`](docs/mobile-flutter.md).
+`mobile/` is a native Flutter app with the same features, screens, routes and wording as the
+web app, including the visual builder (drag to move, drag between handles to connect, pinch to
+zoom). It uses the API's mobile auth mode: the refresh token travels in the request body, is
+stored in the Keychain/Keystore and rotates on every refresh. See
+[`docs/mobile-flutter.md`](docs/mobile-flutter.md).
+
+The Terms text lives in `frontend/src/lib/terms.json`. After editing it, run
+`scripts/sync-shared.sh` to copy it to the mobile app; CI fails if the copies differ.
 
 ## Legal
 

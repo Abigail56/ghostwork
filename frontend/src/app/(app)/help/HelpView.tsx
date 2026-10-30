@@ -51,13 +51,17 @@ export function HelpView() {
           </p>
         </Card>
         <Card>
-          <CardHeader title="Keyboard shortcuts" />
+          <CardHeader title="Shortcuts and gestures" />
           <dl className="flex flex-col gap-2 px-5 py-4 text-body">
             {[
               ["Ctrl K", "Search workflows"],
               ["Ctrl S", "Save in the builder"],
               ["Ctrl Z / Ctrl Shift Z", "Undo / redo in the builder"],
-              ["Delete", "Remove selected step or connection"],
+              ["Delete", "Remove selected step"],
+              ["Drag the step", "Move a step"],
+              ["Drag from a bottom handle", "Connect steps"],
+              ["Pinch, or + / −", "Zoom the canvas"],
+              ["Step settings → Connections", "Remove a connection"],
             ].map(([key, label]) => (
               <div key={key} className="flex items-center justify-between gap-3">
                 <dt className="text-fg-secondary">{label}</dt>

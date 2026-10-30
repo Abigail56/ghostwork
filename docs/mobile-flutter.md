@@ -1,56 +1,56 @@
-# GhostWork mobile (Flutter) — plan
+# GhostWork mobile (Flutter)
 
-Status: **built** (`mobile/`). Flutter 3.47 / Dart 3.13. `flutter analyze` is clean and 18
-tests pass. Verified against the live API in Chrome (web build). Android and iOS builds need
-the Android SDK / Xcode, which aren't installed on the development machine.
+Status: **built, with feature parity with the web app** (`mobile/`). Flutter 3.47 / Dart 3.13.
+`flutter analyze` is clean and 28 tests pass. Verified against the live API in Chrome through the
+web build, including a canvas connection, save and run. **Android and iOS builds have not been run**:
+they need the Android SDK and Xcode, which are not installed on the development machine.
 
-## Scope (initial release)
+## Parity
 
-Optimized for monitoring and quick actions, not authoring:
+Every web route exists at the same path with the same query parameters, and redirects follow the
+same rules (`lib/router.dart`). Design tokens, type scale and components are ported from
+`frontend/src/app/globals.css` and `frontend/src/components/ui`; Geist is bundled in `assets/fonts`.
 
-| Screen | API |
-| --- | --- |
-| Sign in / register | `POST /api/v1/auth/login`, `POST /api/v1/auth/register` with `"client": "mobile"` |
-| Dashboard summary | `GET /api/v1/dashboard/summary` |
-| Workflows | `GET /api/v1/workflows?q=&status=&sort=&page=` |
-| Workflow status | `GET /api/v1/workflows/{id}`, `POST /api/v1/workflows/{id}/status` |
-| Run now | `POST /api/v1/workflows/{id}/run` |
-| Executions | `GET /api/v1/executions?status=&workflow_id=&page=` |
-| Execution detail | `GET /api/v1/executions/{id}` (poll every 1–2 s while `queued`/`running`) |
-| Cancel / re-run | `POST /api/v1/executions/{id}/cancel`, `/rerun` |
-| Notifications | `GET /api/v1/notifications`, `POST /api/v1/notifications/{id}/read` |
-| Profile & settings | `GET /api/v1/auth/me`, `PATCH /api/v1/users/me`, `GET/DELETE /api/v1/auth/sessions` |
+Intentional platform differences:
 
-The visual builder stays web-only.
+- Web tables appear as the card lists the web already uses at phone width. Phones use the same
+  side-drawer navigation; tablets and desktops use the icon rail and sidebar.
+- On web, "Export" downloads a file. Where no save dialog is available, the app copies the JSON
+  to the clipboard.
+- On web, sessions use an HttpOnly cookie. The app stores its refresh token in secure storage
+  (in memory only in the Flutter web build, so it signs in again after a page reload).
+- Dragging from the steps library is available when the canvas is beside it (wide layouts). On
+  phones the library opens as a sheet over the canvas, so steps are added by tapping.
+- Password reset emails link to the web app, because native deep links aren't configured.
 
-## Authentication on mobile
+## Authentication
 
-- Send `"client": "mobile"` on login/register: the response includes `refresh_token`
-  in the body and **no cookie** is set.
-- Store the refresh token with `flutter_secure_storage` (Keychain / Android Keystore).
-  Keep the access token in memory only.
-- Refresh with `POST /api/v1/auth/refresh` and body `{"refresh_token": "..."}`. Every
-  refresh returns a **new** refresh token; persist it immediately. Reusing an old token
-  after the 20 s grace window revokes the session.
-- HTTP 409 from refresh means a concurrent refresh happened; retry once.
-- Sign out with `POST /api/v1/auth/logout` and body `{"refresh_token": "..."}`.
-- No CSRF header is needed for body-token requests.
+- Send `"client": "mobile"` on login/register: the response includes `refresh_token` in the body
+  and no cookie is set.
+- Refresh with `POST /api/v1/auth/refresh` and `{"refresh_token": "..."}`. Every refresh returns a
+  new token, which is stored immediately. HTTP 409 means a concurrent refresh; retry once.
+- Sign out with `POST /api/v1/auth/logout` and `{"refresh_token": "..."}`.
 
-## Architecture
+## Structure
 
-- `lib/data/api_client.dart` — `package:http` client: bearer auth, single-flight refresh
-  on 401, refresh-token rotation, 409 retry, friendly network errors.
-- `lib/data/token_store.dart` — `flutter_secure_storage` on Android/iOS; memory-only on web.
+- `lib/data/` — `api_client.dart` (bearer auth, single-flight refresh, rotation, friendly errors),
+  `models.dart`, `token_store.dart`.
 - `lib/state/providers.dart` — Riverpod auth controller and data providers.
-- `lib/router.dart` — `go_router` with auth redirects and a bottom-navigation shell.
-- `lib/data/models.dart` — hand-written typed models mirroring `frontend/src/lib/types.ts`.
-- Reuse the design tokens from `frontend/src/app/globals.css` (colors, status colors)
-  and the logo from `frontend/public/ghostwork-mark.svg`.
-- Tests: model parsing, the auth interceptor (rotation, 409 retry, logout on 401),
-  and widget tests for execution status rendering.
+- `lib/router.dart` — go_router routes and auth redirects.
+- `lib/ui/components/` — design-system components. `lib/ui/canvas/` — Living Workflow canvas and
+  timeline. `lib/ui/shell/` — app shell. `lib/ui/screens/` — public, auth and app screens.
 
-## Push notifications
+## Running
 
-Not planned for the first release. They need an FCM/APNs setup and a device-token
-endpoint on the API, neither of which exists yet. The app will poll
-`/notifications` while in the foreground.
+```bash
+cd mobile
+flutter test && flutter analyze
+flutter run -d chrome --web-port 8090 --dart-define=API_BASE_URL=http://localhost:8000
+# Android emulator (needs Android Studio): the host machine is 10.0.2.2
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000 --dart-define=WEB_APP_URL=http://10.0.2.2:3000
+```
+
+## Not built
+
+Push notifications need FCM/APNs setup and a device-token endpoint. The app shows in-app
+notifications.

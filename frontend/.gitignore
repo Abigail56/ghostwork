@@ -42,3 +42,4 @@ yarn-error.log*
 next-env.d.ts
 .shoot.tmp.mjs
 .dbg.tmp.mjs
+*.tmp.mjs

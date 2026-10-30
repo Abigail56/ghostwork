@@ -19,7 +19,7 @@ const ACTIONS = [
   { icon: MessageSquare, name: "Slack message", body: "Post to a channel through a Slack incoming webhook." },
 ];
 
-const PLANNED = ["Google Workspace actions", "GitHub events", "Native mobile app for Android and iOS", "Team workspaces and shared workflows"];
+const PLANNED = ["Google Workspace actions", "GitHub events", "Push notifications", "Team workspaces and shared workflows"];
 
 export default function FeaturesPage() {
   return (
